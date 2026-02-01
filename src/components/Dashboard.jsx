@@ -295,6 +295,28 @@ const Dashboard = ({ user, onSignOut }) => {
         console.log('Auth UID:', user?.id);
 
         try {
+            // 1. Ensure Profile Exists (Fix for FK Constraint Error)
+            // If the initial page load failed to create the profile, we force it here.
+            const { error: profileError } = await supabase.from('profiles').upsert({
+                id: user.id, // Primary Key matches Auth ID
+                email: user.email,
+                full_name: user.user_metadata?.full_name || 'Anonymous',
+                avatar_url: user.user_metadata?.avatar_url || '',
+                // Preserve existing rank/sub_rank if row exists, or default if new
+            }, { onConflict: 'id', ignoreDuplicates: false }); // We want to ensure it exists. 
+            // Note: simple upsert might overwrite rank if we aren't careful? 
+            // Actually, if we exclude rank from this object, specific columns update? 
+            // Supabase upsert updates ALL columns passed. If we don't pass rank, does it nil it? 
+            // No, standard SQL update only touches specified columns. 
+            // BUT upsert (INSERT ... ON CONFLICT DO UPDATE) updates specified.
+            // If we only pass id/email, we are safe.
+
+            if (profileError) {
+                console.warn("Profile check warning:", profileError);
+                // We continue, hoping it exists, or catch error below.
+            }
+
+            // 2. Insert Request
             const { error } = await supabase.from('admin_requests').insert([{
                 user_id: user.id,
                 email: user.email,
