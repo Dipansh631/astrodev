@@ -361,10 +361,25 @@ const Dashboard = ({ user, onSignOut }) => {
             return;
         }
 
-        // 2. Remove from local list (since we filter for Pending usually? Or just update it)
+        // 2. Grant Permissions (Update Profile)
+        if (req.type === 'Admin Access') {
+            const { error: profileError } = await supabase.from('profiles')
+                .update({
+                    rank: 'god',
+                    sub_rank: 'Zeus'
+                })
+                .eq('id', req.user_id);
+
+            if (profileError) {
+                console.error("Failed to promote user:", profileError);
+                alert("Request approved but failed to promote user in database.");
+            }
+        }
+
+        // 3. Update Local State
         setAdminRequests(prev => prev.map(r => r.id === reqId ? { ...r, status: 'Approved' } : r));
 
-        alert(`Request from ${req.full_name} (${req.type}) Approved!`);
+        alert(`Request from ${req.full_name} Approved! User promoted to Zeus.`);
     };
 
     const handleReject = async (reqId) => {
