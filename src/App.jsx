@@ -12,7 +12,10 @@ import { supabase } from './lib/supabaseClient'
 
 function App() {
     // idle, falling, blackout, welcome, dashboard
-    const [phase, setPhase] = useState('idle')
+    const [phase, setPhase] = useState(() => {
+        // Initialize phase from session storage if available, else 'idle'
+        return sessionStorage.getItem('appPhase') === 'dashboard' ? 'dashboard' : 'idle'
+    })
     const [user, setUser] = useState(null)
     const [isLoading, setIsLoading] = useState(true)
     const sequenceStarted = useRef(false)
@@ -24,7 +27,14 @@ function App() {
 
             console.log("Starting sequence for user:", userData?.email)
             setUser(userData)
-            handleLogin(userData)
+
+            // Check if we should skip animation (e.g. on refresh)
+            const savedPhase = sessionStorage.getItem('appPhase')
+            if (savedPhase === 'dashboard') {
+                setPhase('dashboard')
+            } else {
+                handleLogin(userData)
+            }
         }
 
         // Check active session and listen for auth changes
@@ -69,6 +79,7 @@ function App() {
                 setUser(null)
                 // Reset phase to idle to show login screen again
                 setPhase('idle')
+                sessionStorage.removeItem('appPhase') // Clear session on sign out
                 sequenceStarted.current = false
             }
         })
@@ -89,6 +100,12 @@ function App() {
                 setPhase('welcome')
             }, 2000)
         }, 30000)
+    }
+
+    // Update session storage when entering dashboard
+    const enterDashboard = () => {
+        setPhase('dashboard')
+        sessionStorage.setItem('appPhase', 'dashboard')
     }
 
     return (
@@ -115,7 +132,7 @@ function App() {
                 </h1>
 
                 <button
-                    onClick={() => setPhase('dashboard')}
+                    onClick={enterDashboard}
                     className="px-8 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/30 rounded-full text-white font-semibold tracking-widest uppercase transition-all transform hover:scale-110 hover:shadow-[0_0_20px_rgba(255,255,255,0.3)] animate-pulse"
                 >
                     Continue

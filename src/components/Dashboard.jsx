@@ -1,62 +1,226 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import SelectionMenu from './SelectionMenu';
+import { SQL_SETUP_SCRIPT, SQL_FIX_CONSTRAINT } from '../lib/databaseSetup';
 
 const Dashboard = ({ user, onSignOut }) => {
-    const [activeSection, setActiveSection] = useState('profile');
+    // Initialize activeSection from session storage if available
+    const [activeSection, setActiveSection] = useState(() => {
+        return sessionStorage.getItem('dashboardSection') || 'profile';
+    });
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [viewingRank, setViewingRank] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
 
-    // User Data State
-    const [mockUsers, setMockUsers] = useState([
-        { id: 1, email: 'dipanshumaheshwari73698@gmail.com', full_name: 'Dipanshu Maheshwari', rank: 'god' },
-        { id: 2, email: 'aditi@astroclub.com', full_name: 'Aditi', rank: 'elite' },
-        { id: 3, email: 'dhruv@astroclub.com', full_name: 'Dhruv', rank: 'legendary' },
-        { id: 4, email: 'yash@astroclub.com', full_name: 'Yash Shakya', rank: 'epic' },
-        { id: 5, email: 'sameeraj@astroclub.com', full_name: 'Sameeraj', rank: 'elite' },
-        { id: 6, email: 'member@astroclub.com', full_name: 'New Member', rank: 'common' },
-    ]);
+    // Data State (Replaces mockUsers)
+    const [users, setUsers] = useState([]);
+    const [adminRequests, setAdminRequests] = useState([]);
 
-    // Admin Requests State
-    const [adminRequests, setAdminRequests] = useState([
-        { id: 101, full_name: 'Nexus Voyager', email: 'nexus@void.com', type: 'Registration', status: 'Pending', date: '2026-02-01' },
-        { id: 102, full_name: 'Karan', email: 'karan@galaxy.org', type: 'Admin Access', status: 'Pending', date: '2026-01-30' },
-        { id: 103, full_name: 'Anya', email: 'anya@nebula.net', type: 'Registration', status: 'Pending', date: '2026-01-28' },
-    ]);
+    // System State
+    const [setupRequired, setSetupRequired] = useState(false);
+    const [constraintError, setConstraintError] = useState(false);
 
-    // Permissions
+    // Derived Permissions
     const isPoseidon = user?.email === 'dipanshumaheshwari73698@gmail.com';
-    // const isZeus = ... (Future implementation based on rank assignment)
-    // const isApollo = ...
+    const PROJECT_ID = 'zcrqbyszzadtdghcxpvl'; // Extracted from error logs
 
+    // --------------------------------------------------------------------------------
+    // 1. Fetch Data on Mount
+    // --------------------------------------------------------------------------------
     useEffect(() => {
-        const fetchUsers = async () => {
-            try {
-                const { data, error } = await supabase.from('profiles').select('*');
-                if (data && data.length > 0) {
-                    // Logic to merge real data would go here
+        const fetchData = async () => {
+            if (!user) return;
+
+            // Definition of Poseidon's identity
+            const POSEIDON_EMAIL = 'dipanshumaheshwari73698@gmail.com';
+            const isPoseidonUser = user.email === POSEIDON_EMAIL;
+
+            // A. Upsert Profile (Ensure user exists and Poseidon has correct rank)
+            const updates = {
+                id: user.id,
+                email: user.email,
+                full_name: user.user_metadata?.full_name || 'Anonymous',
+                avatar_url: user.user_metadata?.avatar_url || '',
+            };
+
+            // Let's do a smart check-and-update
+            const { data: currentProfile, error: profileFetchError } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+
+            // CHECK FOR MISSING TABLE
+            const isTableMissingError = (err) => {
+                return err && (
+                    err.code === '42P01' ||
+                    err.code === 'PGRST205' ||
+                    err.message?.includes('404') ||
+                    err.message?.includes('Could not find the table')
+                );
+            };
+
+            if (isTableMissingError(profileFetchError)) {
+                console.error("Critical: Database Tables Not Found.");
+                setSetupRequired(true);
+                return;
+            }
+
+            if (!currentProfile) {
+                // New User or First Time Load
+                const { error: insertError } = await supabase.from('profiles').insert([{
+                    ...updates,
+                    rank: isPoseidonUser ? 'god' : 'common',
+                    sub_rank: isPoseidonUser ? 'Poseidon' : null
+                }]);
+
+                if (isTableMissingError(insertError)) {
+                    setSetupRequired(true);
+                    return;
                 }
-            } catch (e) {
-                console.error("Error fetching users", e);
+            } else {
+                // Existing User - Enforce Poseidon status if needed
+                if (isPoseidonUser && (currentProfile.rank !== 'god' || currentProfile.sub_rank !== 'Poseidon')) {
+                    console.log("Forcing Poseidon Rank Update...");
+                    await supabase.from('profiles').update({ rank: 'god', sub_rank: 'Poseidon' }).eq('id', user.id);
+                }
+                // Optional: Update metadata if changed
+                if (currentProfile.avatar_url !== updates.avatar_url || currentProfile.full_name !== updates.full_name) {
+                    await supabase.from('profiles').update({
+                        avatar_url: updates.avatar_url,
+                        full_name: updates.full_name
+                    }).eq('id', user.id);
+                }
+            }
+
+            // B. Fetch All Users
+            const { data: allProfiles, error: profilesError } = await supabase.from('profiles').select('*');
+            if (profilesError) {
+                if (isTableMissingError(profilesError)) {
+                    setSetupRequired(true);
+                    return;
+                }
+            } else if (allProfiles) {
+                setUsers(allProfiles);
+            }
+
+            // C. Fetch Admin Requests
+            // Explicitly verify visibility
+            if (isPoseidonUser) {
+                console.log("Fetching Admin Requests for Poseidon...");
+                const { data: requests, error: reqError } = await supabase.from('admin_requests').select('*').order('created_at', { ascending: false });
+                if (reqError) {
+                    console.error("Error fetching requests:", reqError);
+                } else {
+                    console.log("Requests Fetched:", requests);
+                    setAdminRequests(requests);
+                }
             }
         };
-        fetchUsers();
-    }, []);
 
-    const sections = [
-        { id: 'profile', label: 'My Profile' },
-        // Admin Section - Only visible to Poseidon
-        ...(isPoseidon ? [{ id: 'admin', label: 'Command Center' }] : []),
-        { id: 'ranks', label: 'Rank Library' },
-        { id: 'users', label: 'User Directory' },
-        { id: 'photography', label: 'Astro Photography' },
-        { id: 'events', label: 'Events & Activities' },
-        { id: 'about', label: 'About Club' },
-        { id: 'register', label: 'Registration' },
-    ];
+        fetchData();
 
+        // Subscribe to changes for realtime updates (Only if setup is fine)
+        if (!setupRequired) {
+            const profileSub = supabase.channel('public:profiles')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, payload => {
+                    fetchData();
+                })
+                .subscribe();
+
+            const requestSub = supabase.channel('public:admin_requests')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_requests' }, () => {
+                    console.log("Realtime: New Request Detected!");
+                    fetchData();
+                })
+                .subscribe();
+
+            return () => {
+                supabase.removeChannel(profileSub);
+                supabase.removeChannel(requestSub);
+            };
+        }
+    }, [user, setupRequired]);
+
+    const refreshData = () => {
+        // Quick refresh function for the UI
+        const event = new Event('postgres_changes'); // Pseudo event or just reload
+        window.location.reload();
+    };
+
+    // --------------------------------------------------------------------------------
+    // SETUP SCREEN (If DB is missing)
+    // --------------------------------------------------------------------------------
+    if (setupRequired || constraintError) {
+        const scriptToShow = constraintError ? SQL_FIX_CONSTRAINT : SQL_SETUP_SCRIPT;
+        const title = constraintError ? "Protocol Restriction" : "System Failure";
+        const subtitle = constraintError ? "Database Constraint Violation" : "Database Schema Not Initialized";
+        const desc = constraintError ?
+            "The database rejected the request due to a strict security protocol (Check Constraint). You must relax this restriction to continue." :
+            "The AstroWeb communication arrays (Database Tables) are missing. To fix this, you must initialize the database schema.";
+
+        return (
+            <div className="w-full h-full min-h-screen bg-black flex items-center justify-center p-8 relative overflow-hidden">
+                <div className="absolute inset-0 bg-red-900/10 pointer-events-none"></div>
+                <div className="max-w-4xl w-full bg-[#0a0a0a] border border-red-500/30 rounded-3xl p-10 shadow-2xl relative z-10 flex flex-col gap-6">
+                    <div className="flex items-center gap-4 border-b border-white/10 pb-6">
+                        <span className="text-4xl">⚠️</span>
+                        <div>
+                            <h2 className="text-3xl font-bold text-red-500 uppercase tracking-widest">{title}</h2>
+                            <p className="text-gray-400">{subtitle}</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        <p className="text-lg text-white font-light">
+                            {desc}
+                        </p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                            <div className="bg-white/5 rounded-xl p-6 border border-white/10">
+                                <h3 className="text-blue-400 font-bold uppercase tracking-wider mb-4 text-sm">Step 1: Copy SQL</h3>
+                                <div className="h-48 overflow-y-auto bg-black/50 p-4 rounded-lg font-mono text-xs text-green-400 border border-white/5 mb-4 select-all">
+                                    <pre>{scriptToShow}</pre>
+                                </div>
+                                <button
+                                    onClick={() => navigator.clipboard.writeText(scriptToShow).then(() => alert("SQL Copied to Clipboard!"))}
+                                    className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg transition-all uppercase tracking-wider text-xs"
+                                >
+                                    Copy to Clipboard
+                                </button>
+                            </div>
+
+                            <div className="bg-white/5 rounded-xl p-6 border border-white/10 flex flex-col justify-between">
+                                <div>
+                                    <h3 className="text-blue-400 font-bold uppercase tracking-wider mb-4 text-sm">Step 2: Run in Console</h3>
+                                    <ol className="list-decimal list-inside text-gray-300 space-y-3 text-sm">
+                                        <li>Open the <strong>Supabase SQL Editor</strong>.</li>
+                                        <li>Create a <strong>New Query</strong>.</li>
+                                        <li><strong>Paste</strong> the copied SQL script.</li>
+                                        <li>Click <strong>RUN</strong>.</li>
+                                    </ol>
+                                </div>
+                                <a
+                                    href={`https://supabase.com/dashboard/project/${PROJECT_ID}/sql`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-lg transition-all uppercase tracking-wider text-xs text-center flex items-center justify-center gap-2 mt-6"
+                                >
+                                    Open SQL Editor ↗
+                                </a>
+                            </div>
+                        </div>
+
+                        <div className="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-xl mt-4">
+                            <p className="text-yellow-200 text-xs flex items-center gap-2">
+                                <span>ℹ️</span> After running the script, refresh this page (or click Register again).
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // --------------------------------------------------------------------------------
+    // 2. Rank Definitions
+    // --------------------------------------------------------------------------------
     const availableRanks = [
         {
             id: 'god',
@@ -81,41 +245,167 @@ const Dashboard = ({ user, onSignOut }) => {
         { id: 'degradation', label: 'DEGRADATION', color: 'bg-[#1a0f0f]', text: 'text-red-900 line-through opacity-70', border: 'border-red-900/30', shadow: 'shadow-black', desc: 'Fallen Star.', req: 'Violate the intergalactic treaty, violence, inactivity, or misconduct.' },
     ];
 
+    // --------------------------------------------------------------------------------
+    // 3. Helper Functions
+    // --------------------------------------------------------------------------------
     const getUserRank = () => {
+        // Find current user in the 'users' state
+        const foundUser = users.find(u => u.email === user?.email);
+
+        // Use DB rank if found, else fallback to 'common' (or 'god' if hardcoded Poseidon check matches)
+        if (foundUser) {
+            // If DB says 'god' (case insensitive maybe?), return god rank object.
+            // Note: profiles table rank should match ids in availableRanks ('god', 'elite', etc.)
+            return availableRanks.find(r => r.id === foundUser.rank) || availableRanks.find(r => r.id === 'common');
+        }
+
+        // Fallback hardcoded check for Poseidon purely on email if DB fetch hasn't happened yet
         if (user?.email === 'dipanshumaheshwari73698@gmail.com') {
             return availableRanks.find(r => r.id === 'god');
         }
-        // Future: Fetch dynamic rank from user metadata or profile table
         return availableRanks.find(r => r.id === 'common');
     };
 
     const currentRank = getUserRank();
 
     const handleSignOut = async () => {
+        sessionStorage.removeItem('dashboardSection');
         await supabase.auth.signOut();
     };
 
-    const handleSectionClick = (id) => {
+    const changeSection = (id) => {
         setActiveSection(id);
+        sessionStorage.setItem('dashboardSection', id);
+    }
+
+    const handleSectionClick = (id) => {
+        changeSection(id);
         if (window.innerWidth < 768) {
             setIsMenuOpen(false);
         }
     }
 
-    const handleApprove = (reqId) => {
-        setAdminRequests(prev => prev.filter(r => r.id !== reqId));
-        // Logic to add to users list or update DB
-        alert(`Request ${reqId} Approved! (Mock Action)`);
+    // --------------------------------------------------------------------------------
+    // 4. Action Handlers (with DB Sync)
+    // --------------------------------------------------------------------------------
+    const handleAdminRegisterRequest = async () => {
+        if (!user) return;
+
+        console.log('Auth user:', user);
+        console.log('Auth UID:', user?.id);
+
+        try {
+            const { error } = await supabase.from('admin_requests').insert([{
+                user_id: user.id,
+                email: user.email,
+                full_name: user.user_metadata?.full_name || 'Anonymous',
+                type: 'Admin Access',
+                status: 'Pending'
+            }]);
+
+            if (error) {
+                console.error("Error sending request:", error);
+
+                if (error.code === '23514' || error.message?.includes('check constraint')) {
+                    setConstraintError(true);
+                    return;
+                }
+
+                alert("Failed to send request: " + error.message);
+                return;
+            }
+
+            // Success
+            alert("Your request successfully sent to Poseidon. Now you can proceed to your dashboard.");
+            setActiveSection('profile');
+
+        } catch (e) {
+            console.error("Unexpected error:", e);
+            alert("Unexpected error occurred.");
+        }
     };
 
-    const handleReject = (reqId) => {
-        setAdminRequests(prev => prev.filter(r => r.id !== reqId));
+    const handleApprove = async (reqId) => {
+        const req = adminRequests.find(r => r.id === reqId);
+        if (!req) return;
+
+        // 1. Update Request Status
+        const { error: updateError } = await supabase.from('admin_requests')
+            .update({ status: 'Approved' })
+            .eq('id', reqId);
+
+        if (updateError) {
+            alert("Error approving request");
+            return;
+        }
+
+        // 2. Remove from local list (since we filter for Pending usually? Or just update it)
+        setAdminRequests(prev => prev.map(r => r.id === reqId ? { ...r, status: 'Approved' } : r));
+
+        alert(`Request from ${req.full_name} (${req.type}) Approved!`);
     };
 
-    const filteredUsers = mockUsers.filter(u =>
+    const handleReject = async (reqId) => {
+        const { error } = await supabase.from('admin_requests')
+            .update({ status: 'Rejected' })
+            .eq('id', reqId);
+
+        if (!error) {
+            setAdminRequests(prev => prev.map(r => r.id === reqId ? { ...r, status: 'Rejected' } : r));
+        }
+    };
+
+    const handleAssignTag = async (userId, newRankId, subRank = null) => {
+        if (!isPoseidon) {
+            alert("Only Gods can assign tags.");
+            return;
+        }
+
+        const targetUser = users.find(u => u.id === userId);
+        if (targetUser?.email === 'dipanshumaheshwari73698@gmail.com') {
+            alert("Thou shall not alter the Creator's status.");
+            return;
+        }
+
+        // Update DB
+        const { error } = await supabase.from('profiles')
+            .update({ rank: newRankId, sub_rank: subRank })
+            .eq('id', userId);
+
+        if (error) {
+            console.error("Error updating rank:", error);
+            alert("Failed to update rank.");
+        } else {
+            // Update local state
+            setUsers(prev => prev.map(u => {
+                if (u.id === userId) {
+                    return { ...u, rank: newRankId, sub_rank: subRank }; // Note: snake_case for sub_rank
+                }
+                return u;
+            }));
+            alert("Rank updated successfully.");
+        }
+    };
+
+    // Filter users for directory
+    const filteredUsers = users.filter(u =>
         u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.email.toLowerCase().includes(searchTerm.toLowerCase())
+        u.email?.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    // Pending requests for display
+    const pendingRequests = adminRequests.filter(r => r.status === 'Pending');
+
+    const sections = [
+        { id: 'profile', label: 'My Profile' },
+        ...(isPoseidon ? [{ id: 'admin', label: 'Command Center' }] : []),
+        { id: 'ranks', label: 'Rank Library' },
+        { id: 'users', label: 'User Directory' },
+        { id: 'photography', label: 'Astro Photography' },
+        { id: 'events', label: 'Events & Activities' },
+        { id: 'about', label: 'About Club' },
+        { id: 'register', label: 'Registration' },
+    ];
 
     return (
         <div className="w-full h-full bg-transparent text-white font-sans overflow-hidden relative flex">
@@ -218,18 +508,19 @@ const Dashboard = ({ user, onSignOut }) => {
                                             <p className="text-red-400/60 text-sm">Poseidon's Restricted Access Area</p>
                                         </div>
                                     </div>
+                                    <button onClick={refreshData} className="absolute top-8 right-8 px-4 py-2 bg-red-500/10 border border-red-500/20 text-red-500 rounded hover:bg-red-500/20 text-xs uppercase tracking-widest font-bold">Refresh Data</button>
                                 </div>
 
                                 {/* Requests Panel */}
                                 <div>
                                     <h4 className="text-xl font-light text-white mb-6 uppercase tracking-wider flex items-center gap-2">
                                         <span className="w-1.5 h-6 bg-red-500"></span> Pending Requests
-                                        <span className="text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded ml-2">{adminRequests.length}</span>
+                                        <span className="text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded ml-2">{pendingRequests.length}</span>
                                     </h4>
 
-                                    {adminRequests.length > 0 ? (
+                                    {pendingRequests.length > 0 ? (
                                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                                            {adminRequests.map(req => (
+                                            {pendingRequests.map(req => (
                                                 <div key={req.id} className="p-6 rounded-2xl bg-white/5 border border-white/10 hover:border-red-500/30 transition-all group">
                                                     <div className="flex justify-between items-start mb-4">
                                                         <div>
@@ -237,7 +528,7 @@ const Dashboard = ({ user, onSignOut }) => {
                                                             <h5 className="text-xl font-bold text-white">{req.full_name}</h5>
                                                             <p className="text-xs text-gray-500 font-mono mt-1">{req.email}</p>
                                                         </div>
-                                                        <div className="text-[10px] text-gray-600 bg-gray-900 px-2 py-1 rounded">{req.date}</div>
+                                                        <div className="text-[10px] text-gray-600 bg-gray-900 px-2 py-1 rounded">{new Date(req.created_at).toLocaleDateString()}</div>
                                                     </div>
 
                                                     <div className="flex gap-2 mt-6">
@@ -264,6 +555,28 @@ const Dashboard = ({ user, onSignOut }) => {
                                             <p className="text-sm text-gray-500">No pending requests in the queue.</p>
                                         </div>
                                     )}
+                                </div>
+
+                                {/* User Managment Panel (Mock for Assigning Tags) */}
+                                <div className="mt-12">
+                                    <h4 className="text-xl font-light text-white mb-6 uppercase tracking-wider flex items-center gap-2">
+                                        <span className="w-1.5 h-6 bg-red-500"></span> Manage Ranks
+                                    </h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {users.filter(u => u.email !== 'dipanshumaheshwari73698@gmail.com').map(u => (
+                                            <div key={u.id} className="p-4 bg-white/5 border border-white/10 rounded-xl flex items-center justify-between">
+                                                <div>
+                                                    <p className="text-white font-bold">{u.full_name}</p>
+                                                    <p className="text-xs text-gray-400">{u.rank ? u.rank.toUpperCase() : 'UNKNOWN'}</p>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    {/* Mock Buttons to Assign Ranks */}
+                                                    <button onClick={() => handleAssignTag(u.id, 'god', 'Zeus')} className="px-3 py-1 bg-yellow-500/10 text-yellow-500 text-[10px] border border-yellow-500/20 rounded hover:bg-yellow-500/20 uppercase tracking-wide">Promote Zeus</button>
+                                                    <button onClick={() => handleAssignTag(u.id, 'common')} className="px-3 py-1 bg-gray-500/10 text-gray-400 text-[10px] border border-gray-500/20 rounded hover:bg-gray-500/20 uppercase tracking-wide">Demote</button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -313,20 +626,24 @@ const Dashboard = ({ user, onSignOut }) => {
                                     </div>
                                 </div>
                                 <div className="flex flex-col gap-4">
-                                    {filteredUsers.map((u) => {
+                                    {filteredUsers.length === 0 ? (
+                                        <div className="p-8 text-center text-gray-500 italic">Scanning sector... No life forms found (or database is empty).</div>
+                                    ) : filteredUsers.map((u) => {
                                         const uRank = u.email === 'dipanshumaheshwari73698@gmail.com' ? availableRanks.find(r => r.id === 'god') : availableRanks.find(r => r.id === u.rank) || availableRanks.find(r => r.id === 'common');
-                                        const isPoseidon = u.email === 'dipanshumaheshwari73698@gmail.com';
+                                        const isPoseidonUser = u.email === 'dipanshumaheshwari73698@gmail.com';
                                         return (
                                             <div key={u.id} className="p-6 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all flex flex-col md:flex-row items-center justify-between gap-6 group">
                                                 <div className="flex items-center gap-6 w-full md:w-auto">
-                                                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-gray-700 to-gray-900 border-2 border-white/10 flex items-center justify-center text-xl overflow-hidden relative"><div className="absolute inset-0 bg-white/5"></div>{u.email === 'dipanshumaheshwari73698@gmail.com' ? '👑' : '🧑‍🚀'}</div>
+                                                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-gray-700 to-gray-900 border-2 border-white/10 flex items-center justify-center text-xl overflow-hidden relative">
+                                                        {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" /> : <div className="absolute inset-0 bg-white/5 flex items-center justify-center">{isPoseidonUser ? '👑' : '🧑‍🚀'}</div>}
+                                                    </div>
                                                     <div><h4 className="font-bold text-white tracking-wide text-lg">{u.full_name}</h4><p className="text-xs text-gray-500 tracking-wider font-mono">{u.email}</p></div>
                                                 </div>
                                                 <div className="flex items-center gap-4">
-                                                    <span className={`inline-flex items-center px-4 py-1.5 rounded-full text-[10px] uppercase font-bold tracking-[0.2em] border ${isPoseidon ? 'bg-red-900/20 text-red-500 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.2)]' : `${uRank.color} ${uRank.border}`}`}>
-                                                        {isPoseidon ? 'POSEIDON' : uRank.label}
+                                                    <span className={`inline-flex items-center px-4 py-1.5 rounded-full text-[10px] uppercase font-bold tracking-[0.2em] border ${isPoseidonUser ? 'bg-red-900/20 text-red-500 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.2)]' : `${uRank.color} ${uRank.border}`}`}>
+                                                        {isPoseidonUser ? 'POSEIDON' : uRank.label}
                                                     </span>
-                                                    <div className={`w-2 h-2 rounded-full ${isPoseidon ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></div>
+                                                    <div className={`w-2 h-2 rounded-full ${isPoseidonUser ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></div>
                                                 </div>
                                             </div>
                                         );
@@ -354,7 +671,14 @@ const Dashboard = ({ user, onSignOut }) => {
                         )}
 
                         {activeSection === 'register' && (
-                            <div className="flex flex-col items-center justify-center min-h-[50vh]"><h3 className="text-3xl font-thin mb-12 tracking-[0.3em] text-center text-white/80 uppercase">Select Your Path</h3><SelectionMenu /></div>
+                            <div className="flex flex-col items-center justify-center min-h-[50vh]">
+                                <h3 className="text-3xl font-thin mb-12 tracking-[0.3em] text-center text-white/80 uppercase">Select Your Path</h3>
+                                <SelectionMenu
+                                    onAdminRegister={handleAdminRegisterRequest}
+                                    isLocked={users.some(u => u.sub_rank === 'Zeus') && users.some(u => u.sub_rank === 'Apollo') && !isPoseidon}
+                                    isAdmin={currentRank?.id === 'god'}
+                                />
+                            </div>
                         )}
                     </div>
                 </div>
