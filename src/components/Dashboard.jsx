@@ -167,6 +167,17 @@ const Dashboard = ({ user, onSignOut }) => {
     // --------------------------------------------------------------------------------
     // Setup Screen
     // --------------------------------------------------------------------------------
+
+    // Check permissions for Heads Cluster
+    // A user is a Head if their specific role_title is 'Head' (from application) or they have high rank AND are in a department.
+    // Simplifying: If role_title contains 'Head' or they are God.
+    const isHeadOfAnyDept = (
+        currentProfile?.role_title === 'Head' ||
+        currentProfile?.role_title?.includes('Head') ||
+        ['elite', 'legendary'].includes(currentRank?.id)
+    );
+    const userDept = currentProfile?.department;
+
     if (setupRequired || constraintError) {
         const scriptToShow = constraintError ? SQL_FIX_CONSTRAINT : SQL_SETUP_SCRIPT;
         return (
@@ -195,6 +206,7 @@ const Dashboard = ({ user, onSignOut }) => {
     const handleSectionClick = (id) => {
         if (id === 'admin' && !isGod) { alert("You are not a god please live in to your earth"); return; }
         if (id === 'studio' && !isAstroPrivileged) { alert("Access Denied. Restricted Area."); return; }
+        if (id === 'heads_cluster' && !isHeadOfAnyDept && !isGod) { alert("Restricted: Department Heads Only."); return; }
         changeSection(id); if (window.innerWidth < 768) setIsMenuOpen(false);
     }
 
@@ -234,7 +246,7 @@ const Dashboard = ({ user, onSignOut }) => {
             console.error(error);
             alert("Failed to submit application: " + error.message);
         } else {
-            alert(isVerification ? "Verification request sent to Zeus Command Center." : `Application submitted to ${appData.selectedRole} Head.`);
+            alert(isVerification ? "Verification request sent." : `Application submitted.`);
             setIsAppModalOpen(false);
         }
     };
@@ -268,7 +280,8 @@ const Dashboard = ({ user, onSignOut }) => {
             const { error } = await supabase.from('admin_requests').update({ status: 'Approved', approved_by: user.email }).eq('id', reqId);
             if (!error) {
                 let newRank = 'common';
-                if (req.role_title === 'Head' || req.department === 'Vice President' || req.department === 'General Secretary' || req.department === 'Astrophotography Head') newRank = 'legendary';
+                // Logic based on requested role
+                if (req.role_title === 'Head' || req.role_title?.includes('Head') || req.department === 'Vice President' || req.department === 'General Secretary') newRank = 'legendary';
                 else if (req.department === 'President' || req.department === 'Distinguished Alumni' || req.department === 'Research Team') newRank = 'elite';
                 else if (req.role_title === 'Member') newRank = 'rare';
 
@@ -278,7 +291,7 @@ const Dashboard = ({ user, onSignOut }) => {
                     role_title: req.role_title
                 }).eq('id', req.user_id);
 
-                alert(`Application Approved. User set to ${newRank}.`);
+                alert(`Request Approved. User set to ${newRank}.`);
                 setAdminRequests(prev => prev.map(r => r.id === reqId ? { ...r, status: 'Approved', approved_by: user.email } : r));
             }
         }
@@ -306,13 +319,9 @@ const Dashboard = ({ user, onSignOut }) => {
     const handleDeleteUser = async (userId) => {
         if (!isGod) return;
         if (!confirm("Are you sure you want to EXILE this user? This cannot be undone.")) return;
-
         const targetUser = users.find(u => u.id === userId);
         if (targetUser?.email === 'dipanshumaheshwari73698@gmail.com') { alert("You cannot delete the Creator."); return; }
-
-        // Delete from profiles (Supabase Auth delete usually requires server-side admin API, but we can delete profile data)
         const { error } = await supabase.from('profiles').delete().eq('id', userId);
-
         if (error) {
             alert("Exile failed: " + error.message);
         } else {
@@ -333,10 +342,17 @@ const Dashboard = ({ user, onSignOut }) => {
     };
 
     const filteredUsers = users.filter(u => u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()));
-    const pendingRequests = adminRequests.filter(r => r.status === 'Pending');
 
-    // Public Profile Viewer State should be at the top with other hooks, not here.
-    // I will remove it from here and add it to the top.
+    // Filter Requests
+    const pendingRequests = adminRequests.filter(r => r.status === 'Pending');
+    const godRequests = pendingRequests.filter(r => r.type === 'Admin Access' || r.role_title === 'Head' || r.role_title?.includes('Head'));
+    const memberRequests = pendingRequests.filter(r => r.role_title === 'Member'); // Member requests go to Heads
+
+    // For Heads Cluster: Show pending Member requests matching their department
+    const headClusterRequests = pendingRequests.filter(r =>
+        (r.role_title === 'Member') &&
+        (r.department === userDept || isGod) // God sees all in specific view if needed, or primarily in command center
+    );
 
     return (
         <div className="w-full h-full bg-transparent text-white font-sans overflow-hidden relative flex">
@@ -350,8 +366,8 @@ const Dashboard = ({ user, onSignOut }) => {
                                 <h3 className="text-2xl font-bold text-white uppercase tracking-wider">Role Verification</h3>
                                 <p className="text-gray-400">Do you currently hold a position in the Astro Club?</p>
                                 <div className="grid grid-cols-2 gap-4">
-                                    <button onClick={() => handleAppStep1(true)} className="py-4 bg-green-600/20 border border-green-500/50 rounded-xl hover:bg-green-600/40 font-bold text-green-400">Yes, I do</button>
-                                    <button onClick={() => handleAppStep1(false)} className="py-4 bg-blue-600/20 border border-blue-500/50 rounded-xl hover:bg-blue-600/40 font-bold text-blue-400">No, I want to apply</button>
+                                    <button onClick={() => handleAppStep1(true)} className="py-4 bg-green-600/20 border border-green-500/50 rounded-xl hover:bg-green-600/40 font-bold text-green-400 text-sm">I have Head Position in Club</button>
+                                    <button onClick={() => handleAppStep1(false)} className="py-4 bg-blue-600/20 border border-blue-500/50 rounded-xl hover:bg-blue-600/40 font-bold text-blue-400 text-sm">Register as Member</button>
                                 </div>
                             </div>
                         )}
@@ -421,15 +437,12 @@ const Dashboard = ({ user, onSignOut }) => {
                             </div>
 
                             <div className="p-8 overflow-y-auto">
-                                {/* Bio Section */}
                                 <div className="mb-8">
                                     <h4 className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-4 border-b border-white/5 pb-2">Transmission Log</h4>
                                     <p className="text-gray-300 italic leading-relaxed whitespace-pre-wrap pl-4 border-l-2 border-white/10">
                                         {viewingUserProfile.bio || "No transmission recorded."}
                                     </p>
                                 </div>
-
-                                {/* Achievements */}
                                 <div>
                                     <h4 className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-4 border-b border-white/5 pb-2">Badges & Identifiers</h4>
                                     <div className="flex gap-4">
@@ -452,11 +465,23 @@ const Dashboard = ({ user, onSignOut }) => {
             <aside className={`fixed top-0 left-0 h-full w-80 z-[150] bg-white/0 backdrop-blur-xl border-r border-white/5 transform transition-transform duration-500 ease-in-out ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col pt-28 pb-8`}>
                 <div className="px-8 mb-8"><div className="text-xl font-light tracking-[0.2em] text-cyan-300 uppercase opacity-80">Content Table</div></div>
                 <nav className="flex-1 w-full flex flex-col gap-6 px-6 overflow-y-auto no-scrollbar">
-                    {[{ id: 'profile', label: 'My Profile' }, { id: 'admin', label: 'Command Center' }, { id: 'studio', label: 'Astro Studio' }, { id: 'ranks', label: 'Rank Library' }, { id: 'users', label: 'User Directory' }, { id: 'photography', label: 'Astro Photography' }, { id: 'events', label: 'Events & Activities' }, { id: 'about', label: 'About Club' }, { id: 'register', label: 'Registration' }].map((section) => (
+                    {[
+                        { id: 'profile', label: 'My Profile' },
+                        { id: 'admin', label: 'Command Center' },
+                        { id: 'heads_cluster', label: 'Heads Cluster' },
+                        { id: 'studio', label: 'Astro Studio' },
+                        { id: 'ranks', label: 'Rank Library' },
+                        { id: 'users', label: 'User Directory' },
+                        { id: 'photography', label: 'Astro Photography' },
+                        { id: 'events', label: 'Events & Activities' },
+                        { id: 'about', label: 'About Club' },
+                        { id: 'register', label: 'Registration' }
+                    ].map((section) => (
                         <button key={section.id} onClick={() => handleSectionClick(section.id)} className={`w-full text-left px-6 py-2 rounded-xl text-lg tracking-wide font-light transition-all duration-300 ${activeSection === section.id ? 'text-white border-l-2 border-white pl-8 shadow-[0_0_20px_rgba(255,255,255,0.1)]' : 'text-gray-400 hover:text-white hover:pl-8 border-l-2 border-transparent'} flex items-center justify-between group`}>
                             <span>{section.label}</span>
                             {section.id === 'admin' && !isGod && <span className="text-sm opacity-50 group-hover:opacity-100 transition-opacity">🔒</span>}
                             {section.id === 'studio' && !isAstroPrivileged && <span className="text-sm opacity-50 group-hover:opacity-100 transition-opacity">🚫</span>}
+                            {section.id === 'heads_cluster' && (!isHeadOfAnyDept && !isGod) && <span className="text-sm opacity-50 group-hover:opacity-100 transition-opacity">🚫</span>}
                         </button>
                     ))}
                 </nav>
@@ -466,7 +491,10 @@ const Dashboard = ({ user, onSignOut }) => {
             <main className={`flex-1 h-full relative overflow-y-auto no-scrollbar transition-all duration-500 ease-in-out pt-24 px-4 md:px-12 ${isMenuOpen ? 'ml-80' : 'ml-0'}`}>
                 <div className={`max-w-6xl space-y-12 pb-20 transition-all duration-500 ${isMenuOpen ? 'mr-auto' : 'mx-auto'}`}>
                     <header className="flex flex-col md:flex-row items-center justify-between border-b border-white/5 pb-6">
-                        <h2 className="text-4xl font-thin text-white uppercase tracking-[0.2em]">{activeSection === 'admin' ? 'Command Center' : activeSection}</h2>
+                        <h2 className="text-4xl font-thin text-white uppercase tracking-[0.2em]">
+                            {activeSection === 'admin' ? 'Command Center' :
+                                activeSection === 'heads_cluster' ? 'Heads Cluster' : activeSection}
+                        </h2>
                         <div className="flex items-center gap-4 bg-white/5 px-4 py-2 rounded-full border border-white/5 backdrop-blur-sm">
                             <div className="text-right"><p className="text-sm font-medium text-cyan-200">{user?.user_metadata?.full_name}</p><p className="text-[10px] text-gray-400 uppercase">{currentRank?.sub_rank || currentRank?.label}</p></div>
                         </div>
@@ -550,7 +578,6 @@ const Dashboard = ({ user, onSignOut }) => {
                             </div>
                         )}
 
-                        {/* USER DIRECTORY SPLIT */}
                         {activeSection === 'users' && (
                             <div className="space-y-12">
                                 <div className="p-8 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md">
@@ -626,33 +653,96 @@ const Dashboard = ({ user, onSignOut }) => {
                             </div>
                         )}
 
+                        {/* HEADS CLUSTER SECTION */}
+                        {activeSection === 'heads_cluster' && (isHeadOfAnyDept || isGod) && (
+                            <div className="space-y-8 min-h-[60vh]">
+                                <div className="p-8 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md">
+                                    <h3 className="text-2xl font-bold text-white mb-2">Department Control: {userDept || 'All (God Mode)'}</h3>
+                                    <p className="text-gray-400 text-sm">Manage membership approvals for your department.</p>
+                                </div>
+
+                                <div>
+                                    <h4 className="text-xl font-light text-white mb-6 uppercase tracking-wider flex items-center gap-2">
+                                        <span className="w-1.5 h-6 bg-blue-500"></span> Pending Member Requests
+                                    </h4>
+
+                                    {headClusterRequests.length === 0 ? (
+                                        <p className="text-gray-500 italic">No pending requests for your department.</p>
+                                    ) : (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            {headClusterRequests.map(req => (
+                                                <div key={req.id} className="p-6 rounded-2xl bg-white/5 border border-white/10 hover:border-blue-500/30 transition-all">
+                                                    <div className="mb-4">
+                                                        <div className="flex justify-between">
+                                                            <div className="text-xs font-bold text-blue-400 uppercase tracking-widest">{req.type}</div>
+                                                            <div className="text-xs text-gray-500">{req.department}</div>
+                                                        </div>
+                                                        <h5 className="text-xl font-bold text-white mt-1">{req.full_name}</h5>
+                                                        <p className="text-sm text-gray-400 mt-1">Applying as: <span className="text-white font-bold">{req.role_title}</span></p>
+                                                    </div>
+                                                    <div className="flex gap-2 mt-4">
+                                                        <button onClick={() => handleApprove(req.id)} className="flex-1 py-2 bg-green-500/10 text-green-500 rounded border border-green-500/20 hover:bg-green-500/20 text-xs font-bold">Approve</button>
+                                                        <button onClick={() => handleReject(req.id)} className="flex-1 py-2 bg-red-500/10 text-red-500 rounded border border-red-500/20 hover:bg-red-500/20 text-xs font-bold">Reject</button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
                         {activeSection === 'admin' && isGod && (
                             <div className="space-y-8 min-h-[60vh]">
                                 <div>
                                     <h4 className="text-xl font-light text-white mb-6 uppercase tracking-wider flex items-center gap-2">
-                                        <span className="w-1.5 h-6 bg-red-500"></span> Pending Requests
+                                        <span className="w-1.5 h-6 bg-red-500"></span> Pending Head / Admin Requests
+                                    </h4>
+                                    {godRequests.length === 0 ? (
+                                        <p className="text-gray-500 italic mb-8">No high-level requests pending.</p>
+                                    ) : (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-12">
+                                            {godRequests.map(req => (
+                                                <div key={req.id} className="p-6 rounded-2xl bg-white/5 border border-white/10 hover:border-red-500/30 transition-all group">
+                                                    <div className="mb-4">
+                                                        <div className="flex justify-between">
+                                                            <div className="text-xs font-bold text-red-400 uppercase tracking-widest">{req.type}</div>
+                                                            <div className="text-xs text-blue-400">{req.department}</div>
+                                                        </div>
+                                                        <h5 className="text-xl font-bold text-white mt-1">{req.full_name}</h5>
+                                                        {req.role_title && <p className="text-sm text-yellow-500 mt-1">Applying for: {req.role_title}</p>}
+                                                    </div>
+                                                    <div className="flex gap-2 mt-4">
+                                                        {req.type === 'Admin Access' ? (
+                                                            <>
+                                                                <button onClick={() => handleApprove(req.id, 'Zeus')} className="flex-1 py-2 bg-yellow-500/10 text-yellow-500 rounded border border-yellow-500/20 hover:bg-yellow-500/20 text-xs font-bold">Approve Zeus</button>
+                                                                <button onClick={() => handleApprove(req.id, 'Apollo')} className="flex-1 py-2 bg-orange-500/10 text-orange-500 rounded border border-orange-500/20 hover:bg-orange-500/20 text-xs font-bold">Approve Apollo</button>
+                                                            </>
+                                                        ) : (
+                                                            <button onClick={() => handleApprove(req.id)} className="flex-1 py-2 bg-green-500/10 text-green-500 rounded border border-green-500/20 hover:bg-green-500/20 text-xs font-bold">Approve Role</button>
+                                                        )}
+                                                        <button onClick={() => handleReject(req.id)} className="px-4 py-2 bg-red-500/10 text-red-500 rounded border border-red-500/20 hover:bg-red-500/20 text-xs font-bold">Reject</button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* MEMBER REQUESTS OVERVIEW FOR GODS */}
+                                    <h4 className="text-xl font-light text-white mb-6 uppercase tracking-wider flex items-center gap-2">
+                                        <span className="w-1.5 h-6 bg-gray-500"></span> All Member Requests (Overview)
                                     </h4>
                                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                                        {pendingRequests.map(req => (
-                                            <div key={req.id} className="p-6 rounded-2xl bg-white/5 border border-white/10 hover:border-red-500/30 transition-all group">
+                                        {memberRequests.map(req => (
+                                            <div key={req.id} className="p-6 rounded-2xl bg-white/5 border border-white/5 opacity-80 hover:opacity-100 transition-all">
                                                 <div className="mb-4">
-                                                    <div className="flex justify-between">
-                                                        <div className="text-xs font-bold text-red-400 uppercase tracking-widest">{req.type}</div>
-                                                        <div className="text-xs text-blue-400">{req.department}</div>
-                                                    </div>
-                                                    <h5 className="text-xl font-bold text-white mt-1">{req.full_name}</h5>
-                                                    {req.role_title && <p className="text-sm text-yellow-500 mt-1">Applying for: {req.role_title}</p>}
+                                                    <div className="text-xs font-bold text-gray-500 uppercase tracking-widest">{req.type}</div>
+                                                    <h5 className="text-lg font-bold text-white mt-1">{req.full_name}</h5>
+                                                    <p className="text-sm text-gray-400">{req.role_title} @ {req.department}</p>
                                                 </div>
+                                                <div className="text-xs text-gray-500 italic">Delegated to {req.department} Head</div>
                                                 <div className="flex gap-2 mt-4">
-                                                    {req.type === 'Admin Access' ? (
-                                                        <>
-                                                            <button onClick={() => handleApprove(req.id, 'Zeus')} className="flex-1 py-2 bg-yellow-500/10 text-yellow-500 rounded border border-yellow-500/20 hover:bg-yellow-500/20 text-xs font-bold">Approve Zeus</button>
-                                                            <button onClick={() => handleApprove(req.id, 'Apollo')} className="flex-1 py-2 bg-orange-500/10 text-orange-500 rounded border border-orange-500/20 hover:bg-orange-500/20 text-xs font-bold">Approve Apollo</button>
-                                                        </>
-                                                    ) : (
-                                                        <button onClick={() => handleApprove(req.id)} className="flex-1 py-2 bg-green-500/10 text-green-500 rounded border border-green-500/20 hover:bg-green-500/20 text-xs font-bold">Approve Role</button>
-                                                    )}
-                                                    <button onClick={() => handleReject(req.id)} className="px-4 py-2 bg-red-500/10 text-red-500 rounded border border-red-500/20 hover:bg-red-500/20 text-xs font-bold">Reject</button>
+                                                    <button onClick={() => handleApprove(req.id)} className="flex-1 py-2 bg-gray-700/50 rounded text-xs font-bold">Force Approve</button>
                                                 </div>
                                             </div>
                                         ))}
