@@ -585,7 +585,6 @@ const Dashboard = ({ user, onSignOut }) => {
                                                         <select className="bg-black/50 border border-white/20 text-yellow-500 text-xs rounded p-2" value={u.sub_rank || 'Zeus'} onChange={(e) => handleAssignTag(u.id, 'god', e.target.value)}>
                                                             <option value="Zeus">Zeus</option>
                                                             <option value="Apollo">Apollo</option>
-                                                            {isPoseidon && <option value="Poseidon">Poseidon</option>}
                                                         </select>
                                                     )}
                                                 </div>
