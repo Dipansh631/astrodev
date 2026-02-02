@@ -27,6 +27,9 @@ const Dashboard = ({ user, onSignOut }) => {
     const [isBioEditing, setIsBioEditing] = useState(false);
     const [bioInput, setBioInput] = useState('');
 
+    // Loading State
+    const [loading, setLoading] = useState(true);
+
     // System State
     const [setupRequired, setSetupRequired] = useState(false);
     const [constraintError, setConstraintError] = useState(false);
@@ -131,6 +134,7 @@ const Dashboard = ({ user, onSignOut }) => {
             // C. Fetch Admin Requests
             const { data: requests, error: reqError } = await supabase.from('admin_requests').select('*').order('created_at', { ascending: false });
             if (!reqError) setAdminRequests(requests || []);
+            setLoading(false); // Data loaded
         };
 
         fetchData();
@@ -157,6 +161,15 @@ const Dashboard = ({ user, onSignOut }) => {
                     <p>Database schema missing. Please run the SQL setup script.</p>
                     <div className="bg-white/5 p-4 rounded text-xs overflow-auto h-48">{scriptToShow}</div>
                 </div>
+            </div>
+        );
+    }
+
+    // Loading Screen
+    if (loading) {
+        return (
+            <div className="w-full h-full min-h-screen bg-black flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
             </div>
         );
     }
@@ -226,12 +239,17 @@ const Dashboard = ({ user, onSignOut }) => {
         const req = adminRequests.find(r => r.id === reqId);
         if (!req) return;
 
+        if (req.email === 'dipanshumaheshwari73698@gmail.com' && !isPoseidon) {
+            alert("Thou shall not judge the Creator.");
+            return;
+        }
+
         if (req.type === 'Admin Access') {
-            const { error } = await supabase.from('admin_requests').update({ status: 'Approved' }).eq('id', reqId);
+            const { error } = await supabase.from('admin_requests').update({ status: 'Approved', approved_by: user.email }).eq('id', reqId);
             if (!error) await supabase.from('profiles').update({ rank: 'god', sub_rank: subRank }).eq('id', req.user_id);
-            setAdminRequests(prev => prev.map(r => r.id === reqId ? { ...r, status: 'Approved' } : r));
+            setAdminRequests(prev => prev.map(r => r.id === reqId ? { ...r, status: 'Approved', approved_by: user.email } : r));
         } else {
-            const { error } = await supabase.from('admin_requests').update({ status: 'Approved' }).eq('id', reqId);
+            const { error } = await supabase.from('admin_requests').update({ status: 'Approved', approved_by: user.email }).eq('id', reqId);
             if (!error) {
                 let newRank = 'common';
                 if (req.role_title === 'Head' || req.department === 'Vice President' || req.department === 'General Secretary' || req.department === 'Astrophotography Head') newRank = 'legendary';
@@ -245,7 +263,7 @@ const Dashboard = ({ user, onSignOut }) => {
                 }).eq('id', req.user_id);
 
                 alert(`Application Approved. User set to ${newRank}.`);
-                setAdminRequests(prev => prev.map(r => r.id === reqId ? { ...r, status: 'Approved' } : r));
+                setAdminRequests(prev => prev.map(r => r.id === reqId ? { ...r, status: 'Approved', approved_by: user.email } : r));
             }
         }
     };
@@ -258,7 +276,11 @@ const Dashboard = ({ user, onSignOut }) => {
     const handleAssignTag = async (userId, newRankId, subRank = null) => {
         if (!isGod) { alert("Only Gods can assign tags."); return; }
         const targetUser = users.find(u => u.id === userId);
+
+        // Poseidon Protection: Ensure only Poseidon can edit Poseidon or assign Poseidon rank
         if (targetUser?.email === 'dipanshumaheshwari73698@gmail.com' && !isPoseidon) { alert("Thou shall not alter the Creator."); return; }
+        if (subRank === 'Poseidon' && !isPoseidon) { alert("Only the Creator can appoint a Poseidon."); return; }
+
         const { error } = await supabase.from('profiles').update({ rank: newRankId, sub_rank: subRank }).eq('id', userId);
         if (error) alert("Failed."); else {
             setUsers(prev => prev.map(u => u.id === userId ? { ...u, rank: newRankId, sub_rank: subRank } : u));
@@ -552,7 +574,9 @@ const Dashboard = ({ user, onSignOut }) => {
                                                     </select>
                                                     {u.rank === 'god' && (
                                                         <select className="bg-black/50 border border-white/20 text-yellow-500 text-xs rounded p-2" value={u.sub_rank || 'Zeus'} onChange={(e) => handleAssignTag(u.id, 'god', e.target.value)}>
-                                                            <option value="Zeus">Zeus</option><option value="Apollo">Apollo</option><option value="Poseidon">Poseidon</option>
+                                                            <option value="Zeus">Zeus</option>
+                                                            <option value="Apollo">Apollo</option>
+                                                            {isPoseidon && <option value="Poseidon">Poseidon</option>}
                                                         </select>
                                                     )}
                                                 </div>
