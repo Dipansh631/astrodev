@@ -266,7 +266,7 @@ const Dashboard = ({ user, onSignOut }) => {
                 }).eq('id', req.user_id);
 
                 // Notify
-                await supabase.from('notifications').insert([{ user_id: req.user_id, message: `Congratulations! Your request for position '${req.role_title}' in ${req.department} has been APPROVED.` }]);
+                await supabase.from('notifications').insert([{ user_id: req.user_id, message: `Congratulations! Your application was approved by the Head.` }]);
 
                 alert(`Request Approved.`);
                 setAdminRequests(prev => prev.map(r => r.id === reqId ? { ...r, status: 'Approved', approved_by: user.email } : r));
