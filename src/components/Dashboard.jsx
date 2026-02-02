@@ -20,8 +20,51 @@ const Dashboard = ({ user, onSignOut }) => {
     const [setupRequired, setSetupRequired] = useState(false);
     const [constraintError, setConstraintError] = useState(false);
 
-    // Derived Permissions
+    // --------------------------------------------------------------------------------
+    // 2. Rank Definitions
+    // --------------------------------------------------------------------------------
+    const availableRanks = [
+        {
+            id: 'god',
+            label: 'GOD',
+            color: 'bg-gradient-to-r from-yellow-300 via-red-500 to-purple-600',
+            text: 'text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-white to-yellow-200',
+            border: 'border-yellow-500/50',
+            shadow: 'shadow-yellow-500/40',
+            desc: 'The Creator of the Cosmos.',
+            req: 'Achieve total mastery and contribute to the code of the universe. No one can achieve this level except 3.',
+            subCategories: [
+                { name: 'Zeus', title: 'The Ruler', desc: 'Commander of the cosmic heavens', color: 'text-yellow-400' },
+                { name: 'Apollo', title: 'The Visionary', desc: 'Bringer of light and truth', color: 'text-orange-400' },
+                { name: 'Poseidon', title: 'The Shaper', desc: 'Master of the deep void', color: 'text-red-500' }
+            ]
+        },
+        { id: 'elite', label: 'ELITE', color: 'bg-red-900/20', text: 'text-red-400', border: 'border-red-500/50', shadow: 'shadow-red-500/20', desc: 'The Vanguard of the Fleet.', req: 'Reserved for the President, Distinguished Alumni, and Authors of Research Papers.' },
+        { id: 'legendary', label: 'LEGENDARY', color: 'bg-orange-800/20', text: 'text-orange-300', border: 'border-orange-500/50', shadow: 'shadow-orange-500/20', desc: 'A Myth Among Stars.', req: 'Held a leading post: Vice President, General Secretary, Tech/Finance/Content/Design/Web Head, or Telescope Handler.' },
+        { id: 'epic', label: 'EPIC', color: 'bg-purple-900/20', text: 'text-purple-300', border: 'border-purple-500/50', shadow: 'shadow-purple-500/20', desc: 'Hero of the Void.', req: 'Awarded to Event Winners and the PR & Branding Team.' },
+        { id: 'rare', label: 'RARE', color: 'bg-blue-900/20', text: 'text-blue-300', border: 'border-blue-500/50', shadow: 'shadow-blue-500/20', desc: 'Distinguished Explorer.', req: 'Participate actively in events or work under a leadership post.' },
+        { id: 'common', label: 'COMMON', color: 'bg-gray-800/20', text: 'text-gray-300', border: 'border-gray-500/50', shadow: 'shadow-gray-500/20', desc: 'The Journey Begins.', req: 'Join the Astro Club.' },
+        { id: 'degradation', label: 'DEGRADATION', color: 'bg-[#1a0f0f]', text: 'text-red-900 line-through opacity-70', border: 'border-red-900/30', shadow: 'shadow-black', desc: 'Fallen Star.', req: 'Violate the intergalactic treaty, violence, inactivity, or misconduct.' },
+    ];
+
+    // Derived Permissions helpers must be after Rank Defs or inside component
+    const getUserRank = (targetUser = user) => {
+        // Find current user in the 'users' state if not passed explicitly, or use passed user
+        // If we are looking up 'user', we should look in the 'users' array for the most up-to-date data
+        const foundUser = users.find(u => u.email === targetUser?.email);
+
+        const rankId = foundUser?.rank || 'common';
+        const rankObj = availableRanks.find(r => r.id === rankId) || availableRanks.find(r => r.id === 'common');
+
+        return {
+            ...rankObj,
+            sub_rank: foundUser?.sub_rank
+        };
+    };
+
+    const currentRank = getUserRank(user);
     const isPoseidon = user?.email === 'dipanshumaheshwari73698@gmail.com';
+    const isGod = currentRank?.id === 'god';
     const PROJECT_ID = 'zcrqbyszzadtdghcxpvl'; // Extracted from error logs
 
     // --------------------------------------------------------------------------------
@@ -102,15 +145,12 @@ const Dashboard = ({ user, onSignOut }) => {
 
             // C. Fetch Admin Requests
             // Explicitly verify visibility
-            if (isPoseidonUser) {
-                console.log("Fetching Admin Requests for Poseidon...");
-                const { data: requests, error: reqError } = await supabase.from('admin_requests').select('*').order('created_at', { ascending: false });
-                if (reqError) {
-                    console.error("Error fetching requests:", reqError);
-                } else {
-                    console.log("Requests Fetched:", requests);
-                    setAdminRequests(requests);
-                }
+            // Fetch for everyone, but rely on RLS. If RLS fails (empty), that's fine.
+            const { data: requests, error: reqError } = await supabase.from('admin_requests').select('*').order('created_at', { ascending: false });
+            if (reqError) {
+                console.error("Error fetching requests:", reqError);
+            } else {
+                setAdminRequests(requests || []);
             }
         };
 
@@ -218,56 +258,6 @@ const Dashboard = ({ user, onSignOut }) => {
         );
     }
 
-    // --------------------------------------------------------------------------------
-    // 2. Rank Definitions
-    // --------------------------------------------------------------------------------
-    const availableRanks = [
-        {
-            id: 'god',
-            label: 'GOD',
-            color: 'bg-gradient-to-r from-yellow-300 via-red-500 to-purple-600',
-            text: 'text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-white to-yellow-200',
-            border: 'border-yellow-500/50',
-            shadow: 'shadow-yellow-500/40',
-            desc: 'The Creator of the Cosmos.',
-            req: 'Achieve total mastery and contribute to the code of the universe. No one can achieve this level except 3.',
-            subCategories: [
-                { name: 'Zeus', title: 'The Ruler', desc: 'Commander of the cosmic heavens', color: 'text-yellow-400' },
-                { name: 'Apollo', title: 'The Visionary', desc: 'Bringer of light and truth', color: 'text-orange-400' },
-                { name: 'Poseidon', title: 'The Shaper', desc: 'Master of the deep void', color: 'text-red-500' }
-            ]
-        },
-        { id: 'elite', label: 'ELITE', color: 'bg-red-900/20', text: 'text-red-400', border: 'border-red-500/50', shadow: 'shadow-red-500/20', desc: 'The Vanguard of the Fleet.', req: 'Reserved for the President, Distinguished Alumni, and Authors of Research Papers.' },
-        { id: 'legendary', label: 'LEGENDARY', color: 'bg-orange-800/20', text: 'text-orange-300', border: 'border-orange-500/50', shadow: 'shadow-orange-500/20', desc: 'A Myth Among Stars.', req: 'Held a leading post: Vice President, General Secretary, Tech/Finance/Content/Design/Web Head, or Telescope Handler.' },
-        { id: 'epic', label: 'EPIC', color: 'bg-purple-900/20', text: 'text-purple-300', border: 'border-purple-500/50', shadow: 'shadow-purple-500/20', desc: 'Hero of the Void.', req: 'Awarded to Event Winners and the PR & Branding Team.' },
-        { id: 'rare', label: 'RARE', color: 'bg-blue-900/20', text: 'text-blue-300', border: 'border-blue-500/50', shadow: 'shadow-blue-500/20', desc: 'Distinguished Explorer.', req: 'Participate actively in events or work under a leadership post.' },
-        { id: 'common', label: 'COMMON', color: 'bg-gray-800/20', text: 'text-gray-300', border: 'border-gray-500/50', shadow: 'shadow-gray-500/20', desc: 'The Journey Begins.', req: 'Join the Astro Club.' },
-        { id: 'degradation', label: 'DEGRADATION', color: 'bg-[#1a0f0f]', text: 'text-red-900 line-through opacity-70', border: 'border-red-900/30', shadow: 'shadow-black', desc: 'Fallen Star.', req: 'Violate the intergalactic treaty, violence, inactivity, or misconduct.' },
-    ];
-
-    // --------------------------------------------------------------------------------
-    // 3. Helper Functions
-    // --------------------------------------------------------------------------------
-    const getUserRank = () => {
-        // Find current user in the 'users' state
-        const foundUser = users.find(u => u.email === user?.email);
-
-        // Use DB rank if found, else fallback to 'common' (or 'god' if hardcoded Poseidon check matches)
-        if (foundUser) {
-            // If DB says 'god' (case insensitive maybe?), return god rank object.
-            // Note: profiles table rank should match ids in availableRanks ('god', 'elite', etc.)
-            return availableRanks.find(r => r.id === foundUser.rank) || availableRanks.find(r => r.id === 'common');
-        }
-
-        // Fallback hardcoded check for Poseidon purely on email if DB fetch hasn't happened yet
-        if (user?.email === 'dipanshumaheshwari73698@gmail.com') {
-            return availableRanks.find(r => r.id === 'god');
-        }
-        return availableRanks.find(r => r.id === 'common');
-    };
-
-    const currentRank = getUserRank();
-
     const handleSignOut = async () => {
         sessionStorage.removeItem('dashboardSection');
         await supabase.auth.signOut();
@@ -279,6 +269,12 @@ const Dashboard = ({ user, onSignOut }) => {
     }
 
     const handleSectionClick = (id) => {
+        // Access Control for Command Center
+        if (id === 'admin' && !isGod) {
+            alert("You are not a god please live in to your earth");
+            return;
+        }
+
         changeSection(id);
         if (window.innerWidth < 768) {
             setIsMenuOpen(false);
@@ -295,8 +291,6 @@ const Dashboard = ({ user, onSignOut }) => {
         console.log('Auth UID:', user?.id);
 
         try {
-            // 1. Ensure Profile Exists (Fix for FK Constraint Error)
-            // If the initial page load failed to create the profile, we force it here.
             // 1. Ensure Profile Exists (Safe Check)
             const { data: existingProfile } = await supabase.from('profiles').select('id').eq('id', user.id).single();
 
@@ -314,23 +308,6 @@ const Dashboard = ({ user, onSignOut }) => {
                     full_name: user.user_metadata?.full_name || 'Anonymous',
                     avatar_url: user.user_metadata?.avatar_url || ''
                 }).eq('id', user.id);
-            }
-
-            // Replaces the old upsert block logic entirely
-            const profileError = null; // Mock variable to satisfy downstream checks if any strings attached (though we removed the check block below hopefully if we match larger)
-            // Wait, I am only targeting 300-306.
-            // But lines 307-317 are referencing 'upsert' context or using 'profileError'.
-            // I need to ensure variables align. 
-            // Note: simple upsert might overwrite rank if we aren't careful? 
-            // Actually, if we exclude rank from this object, specific columns update? 
-            // Supabase upsert updates ALL columns passed. If we don't pass rank, does it nil it? 
-            // No, standard SQL update only touches specified columns. 
-            // BUT upsert (INSERT ... ON CONFLICT DO UPDATE) updates specified.
-            // If we only pass id/email, we are safe.
-
-            if (profileError) {
-                console.warn("Profile check warning:", profileError);
-                // We continue, hoping it exists, or catch error below.
             }
 
             // 2. Insert Request
@@ -364,7 +341,7 @@ const Dashboard = ({ user, onSignOut }) => {
         }
     };
 
-    const handleApprove = async (reqId) => {
+    const handleApprove = async (reqId, subRank = 'Zeus') => {
         const req = adminRequests.find(r => r.id === reqId);
         if (!req) return;
 
@@ -383,7 +360,7 @@ const Dashboard = ({ user, onSignOut }) => {
             const { error: profileError } = await supabase.from('profiles')
                 .update({
                     rank: 'god',
-                    sub_rank: 'Zeus'
+                    sub_rank: subRank
                 })
                 .eq('id', req.user_id);
 
@@ -396,7 +373,7 @@ const Dashboard = ({ user, onSignOut }) => {
         // 3. Update Local State
         setAdminRequests(prev => prev.map(r => r.id === reqId ? { ...r, status: 'Approved' } : r));
 
-        alert(`Request from ${req.full_name} Approved! User promoted to Zeus.`);
+        alert(`Request from ${req.full_name} Approved! User promoted to ${subRank}.`);
     };
 
     const handleReject = async (reqId) => {
@@ -410,7 +387,7 @@ const Dashboard = ({ user, onSignOut }) => {
     };
 
     const handleAssignTag = async (userId, newRankId, subRank = null) => {
-        if (!isPoseidon) {
+        if (!isGod) {
             alert("Only Gods can assign tags.");
             return;
         }
@@ -430,14 +407,14 @@ const Dashboard = ({ user, onSignOut }) => {
             console.error("Error updating rank:", error);
             alert("Failed to update rank.");
         } else {
-            // Update local state
+            // Update local state is handled by realtime subscription usually, but optimistic update is good
             setUsers(prev => prev.map(u => {
                 if (u.id === userId) {
-                    return { ...u, rank: newRankId, sub_rank: subRank }; // Note: snake_case for sub_rank
+                    return { ...u, rank: newRankId, sub_rank: subRank };
                 }
                 return u;
             }));
-            alert("Rank updated successfully.");
+            // alert("Rank updated successfully.");
         }
     };
 
@@ -452,7 +429,7 @@ const Dashboard = ({ user, onSignOut }) => {
 
     const sections = [
         { id: 'profile', label: 'My Profile' },
-        ...(isPoseidon ? [{ id: 'admin', label: 'Command Center' }] : []),
+        { id: 'admin', label: 'Command Center' },
         { id: 'ranks', label: 'Rank Library' },
         { id: 'users', label: 'User Directory' },
         { id: 'photography', label: 'Astro Photography' },
@@ -474,8 +451,11 @@ const Dashboard = ({ user, onSignOut }) => {
                 <div className="px-8 mb-8"><div className="text-xl font-light tracking-[0.2em] text-cyan-300 uppercase opacity-80">Content Table</div></div>
                 <nav className="flex-1 w-full flex flex-col gap-6 px-6 overflow-y-auto no-scrollbar">
                     {sections.map((section) => (
-                        <button key={section.id} onClick={() => handleSectionClick(section.id)} className={`w-full text-left px-6 py-2 rounded-xl text-lg tracking-wide font-light transition-all duration-300 ${activeSection === section.id ? 'text-white border-l-2 border-white pl-8 shadow-[0_0_20px_rgba(255,255,255,0.1)]' : 'text-gray-400 hover:text-white hover:pl-8 border-l-2 border-transparent'}`}>
-                            {section.label}
+                        <button key={section.id} onClick={() => handleSectionClick(section.id)} className={`w-full text-left px-6 py-2 rounded-xl text-lg tracking-wide font-light transition-all duration-300 ${activeSection === section.id ? 'text-white border-l-2 border-white pl-8 shadow-[0_0_20px_rgba(255,255,255,0.1)]' : 'text-gray-400 hover:text-white hover:pl-8 border-l-2 border-transparent'} flex items-center justify-between group`}>
+                            <span>{section.label}</span>
+                            {section.id === 'admin' && !isGod && (
+                                <span className="text-sm opacity-50 group-hover:opacity-100 transition-opacity">🔒</span>
+                            )}
                         </button>
                     ))}
                 </nav>
@@ -496,7 +476,7 @@ const Dashboard = ({ user, onSignOut }) => {
                             {user?.user_metadata?.avatar_url && <img src={user.user_metadata.avatar_url} alt="Avatar" className="w-10 h-10 rounded-full border border-white/20" />}
                             <div className="text-right hidden md:block">
                                 <p className="text-sm font-medium text-cyan-200 tracking-wide">{user?.user_metadata?.full_name || user?.email}</p>
-                                <p className="text-[10px] text-gray-400 uppercase tracking-widest">{currentRank?.label || 'Explorer'}</p>
+                                <p className="text-[10px] text-gray-400 uppercase tracking-widest">{currentRank?.sub_rank || currentRank?.label || 'Explorer'}</p>
                             </div>
                         </div>
                     </header>
@@ -521,9 +501,10 @@ const Dashboard = ({ user, onSignOut }) => {
                                                 </h3>
                                                 <p className="text-gray-400 font-mono text-sm mb-4">{user?.email}</p>
                                                 {currentRank && (
-                                                    <span className={`inline-flex items-center px-6 py-2 ${user?.email === 'dipanshumaheshwari73698@gmail.com' && currentRank.id === 'god' ? 'bg-red-900/20 border-red-500/50 shadow-red-500/40' : currentRank.color + ' border ' + currentRank.border + ' ' + currentRank.shadow} border rounded-full font-bold text-xs tracking-[0.2em] uppercase`}>
-                                                        <span className={user?.email === 'dipanshumaheshwari73698@gmail.com' && currentRank.id === 'god' ? 'text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]' : currentRank.text}>
-                                                            {user?.email === 'dipanshumaheshwari73698@gmail.com' && currentRank.id === 'god' ? 'POSEIDON' : currentRank.label}
+                                                    <span className={`inline-flex items-center px-6 py-2 ${currentRank.id === 'god' ? 'bg-red-900/20 border-red-500/50 shadow-red-500/40' : currentRank.color + ' border ' + currentRank.border + ' ' + currentRank.shadow} border rounded-full font-bold text-xs tracking-[0.2em] uppercase`}>
+                                                        <span className={currentRank.id === 'god' ? 'text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]' : currentRank.text}>
+                                                            {/* Priority: Sub Rank > Rank Label */}
+                                                            {currentRank.sub_rank ? currentRank.sub_rank : currentRank.label}
                                                         </span>
                                                     </span>
                                                 )}
@@ -552,14 +533,14 @@ const Dashboard = ({ user, onSignOut }) => {
                         )}
 
                         {/* ADMIN COMMAND CENTER */}
-                        {activeSection === 'admin' && isPoseidon && (
+                        {activeSection === 'admin' && isGod && (
                             <div className="space-y-8 min-h-[60vh]">
                                 <div className="p-8 rounded-3xl bg-red-900/10 border border-red-500/30 backdrop-blur-md">
                                     <div className="flex items-center gap-4 mb-2">
                                         <span className="text-3xl">🔱</span>
                                         <div>
                                             <h3 className="text-2xl font-bold text-red-500 uppercase tracking-widest">Command Center</h3>
-                                            <p className="text-red-400/60 text-sm">Poseidon's Restricted Access Area</p>
+                                            <p className="text-red-400/60 text-sm">Restricted Access Area</p>
                                         </div>
                                     </div>
                                     <button onClick={refreshData} className="absolute top-8 right-8 px-4 py-2 bg-red-500/10 border border-red-500/20 text-red-500 rounded hover:bg-red-500/20 text-xs uppercase tracking-widest font-bold">Refresh Data</button>
@@ -585,16 +566,22 @@ const Dashboard = ({ user, onSignOut }) => {
                                                         <div className="text-[10px] text-gray-600 bg-gray-900 px-2 py-1 rounded">{new Date(req.created_at).toLocaleDateString()}</div>
                                                     </div>
 
-                                                    <div className="flex gap-2 mt-6">
+                                                    <div className="flex gap-2 mt-6 flex-wrap">
                                                         <button
-                                                            onClick={() => handleApprove(req.id)}
-                                                            className="flex-1 py-2 bg-green-500/10 border border-green-500/30 text-green-400 rounded-lg hover:bg-green-500/20 transition-all font-bold text-xs uppercase tracking-wider"
+                                                            onClick={() => handleApprove(req.id, 'Zeus')}
+                                                            className="flex-1 py-2 bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 rounded-lg hover:bg-yellow-500/20 transition-all font-bold text-xs uppercase tracking-wider whitespace-nowrap"
                                                         >
-                                                            Approve
+                                                            Approve Zeus
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleApprove(req.id, 'Apollo')}
+                                                            className="flex-1 py-2 bg-orange-500/10 border border-orange-500/30 text-orange-500 rounded-lg hover:bg-orange-500/20 transition-all font-bold text-xs uppercase tracking-wider whitespace-nowrap"
+                                                        >
+                                                            Approve Apollo
                                                         </button>
                                                         <button
                                                             onClick={() => handleReject(req.id)}
-                                                            className="flex-1 py-2 bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg hover:bg-red-500/20 transition-all font-bold text-xs uppercase tracking-wider"
+                                                            className="px-4 py-2 bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg hover:bg-red-500/20 transition-all font-bold text-xs uppercase tracking-wider"
                                                         >
                                                             Reject
                                                         </button>
@@ -611,22 +598,43 @@ const Dashboard = ({ user, onSignOut }) => {
                                     )}
                                 </div>
 
-                                {/* User Managment Panel (Mock for Assigning Tags) */}
+                                {/* User Managment Panel (Assign Any Rank) */}
                                 <div className="mt-12">
                                     <h4 className="text-xl font-light text-white mb-6 uppercase tracking-wider flex items-center gap-2">
                                         <span className="w-1.5 h-6 bg-red-500"></span> Manage Ranks
                                     </h4>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="grid grid-cols-1 gap-4">
                                         {users.filter(u => u.email !== 'dipanshumaheshwari73698@gmail.com').map(u => (
-                                            <div key={u.id} className="p-4 bg-white/5 border border-white/10 rounded-xl flex items-center justify-between">
-                                                <div>
+                                            <div key={u.id} className="p-4 bg-white/5 border border-white/10 rounded-xl flex flex-col md:flex-row items-center justify-between gap-4">
+                                                <div className="flex-1">
                                                     <p className="text-white font-bold">{u.full_name}</p>
-                                                    <p className="text-xs text-gray-400">{u.rank ? u.rank.toUpperCase() : 'UNKNOWN'}</p>
+                                                    <p className="text-xs text-gray-400">{u.email}</p>
+                                                    <p className="text-xs text-blue-400 mt-1">Current: {u.sub_rank || u.rank?.toUpperCase()}</p>
                                                 </div>
-                                                <div className="flex gap-2">
-                                                    {/* Mock Buttons to Assign Ranks */}
-                                                    <button onClick={() => handleAssignTag(u.id, 'god', 'Zeus')} className="px-3 py-1 bg-yellow-500/10 text-yellow-500 text-[10px] border border-yellow-500/20 rounded hover:bg-yellow-500/20 uppercase tracking-wide">Promote Zeus</button>
-                                                    <button onClick={() => handleAssignTag(u.id, 'common')} className="px-3 py-1 bg-gray-500/10 text-gray-400 text-[10px] border border-gray-500/20 rounded hover:bg-gray-500/20 uppercase tracking-wide">Demote</button>
+                                                <div className="flex items-center gap-2">
+                                                    {/* Rank Selector */}
+                                                    <select
+                                                        className="bg-black/50 border border-white/20 text-white text-xs rounded p-2 focus:border-red-500 outline-none"
+                                                        value={u.rank || 'common'}
+                                                        onChange={(e) => handleAssignTag(u.id, e.target.value, (e.target.value !== 'god' ? null : 'Zeus'))}
+                                                    >
+                                                        {availableRanks.map(r => (
+                                                            <option key={r.id} value={r.id}>{r.label}</option>
+                                                        ))}
+                                                    </select>
+
+                                                    {/* Sub-Rank Selector (Only if GOD) */}
+                                                    {u.rank === 'god' && (
+                                                        <select
+                                                            className="bg-black/50 border border-white/20 text-yellow-500 text-xs rounded p-2 focus:border-yellow-500 outline-none"
+                                                            value={u.sub_rank || 'Zeus'}
+                                                            onChange={(e) => handleAssignTag(u.id, 'god', e.target.value)}
+                                                        >
+                                                            <option value="Zeus">Zeus</option>
+                                                            <option value="Apollo">Apollo</option>
+                                                            <option value="Poseidon">Poseidon</option>
+                                                        </select>
+                                                    )}
                                                 </div>
                                             </div>
                                         ))}
@@ -683,21 +691,22 @@ const Dashboard = ({ user, onSignOut }) => {
                                     {filteredUsers.length === 0 ? (
                                         <div className="p-8 text-center text-gray-500 italic">Scanning sector... No life forms found (or database is empty).</div>
                                     ) : filteredUsers.map((u) => {
-                                        const uRank = u.email === 'dipanshumaheshwari73698@gmail.com' ? availableRanks.find(r => r.id === 'god') : availableRanks.find(r => r.id === u.rank) || availableRanks.find(r => r.id === 'common');
-                                        const isPoseidonUser = u.email === 'dipanshumaheshwari73698@gmail.com';
+                                        const uRankData = getUserRank(u);
+                                        const isRankGod = uRankData.id === 'god';
+
                                         return (
                                             <div key={u.id} className="p-6 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all flex flex-col md:flex-row items-center justify-between gap-6 group">
                                                 <div className="flex items-center gap-6 w-full md:w-auto">
                                                     <div className="w-14 h-14 rounded-full bg-gradient-to-br from-gray-700 to-gray-900 border-2 border-white/10 flex items-center justify-center text-xl overflow-hidden relative">
-                                                        {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" /> : <div className="absolute inset-0 bg-white/5 flex items-center justify-center">{isPoseidonUser ? '👑' : '🧑‍🚀'}</div>}
+                                                        {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" /> : <div className="absolute inset-0 bg-white/5 flex items-center justify-center">{isRankGod ? '👑' : '🧑‍🚀'}</div>}
                                                     </div>
                                                     <div><h4 className="font-bold text-white tracking-wide text-lg">{u.full_name}</h4><p className="text-xs text-gray-500 tracking-wider font-mono">{u.email}</p></div>
                                                 </div>
                                                 <div className="flex items-center gap-4">
-                                                    <span className={`inline-flex items-center px-4 py-1.5 rounded-full text-[10px] uppercase font-bold tracking-[0.2em] border ${isPoseidonUser ? 'bg-red-900/20 text-red-500 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.2)]' : `${uRank.color} ${uRank.border}`}`}>
-                                                        {isPoseidonUser ? 'POSEIDON' : uRank.label}
+                                                    <span className={`inline-flex items-center px-4 py-1.5 rounded-full text-[10px] uppercase font-bold tracking-[0.2em] border ${isRankGod ? 'bg-red-900/20 text-red-500 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.2)]' : `${uRankData.color} ${uRankData.border}`}`}>
+                                                        {uRankData.sub_rank ? uRankData.sub_rank : uRankData.label}
                                                     </span>
-                                                    <div className={`w-2 h-2 rounded-full ${isPoseidonUser ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></div>
+                                                    <div className={`w-2 h-2 rounded-full ${isRankGod ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></div>
                                                 </div>
                                             </div>
                                         );
