@@ -23,6 +23,9 @@ const Dashboard = ({ user, onSignOut }) => {
     const [appStep, setAppStep] = useState(1); // 1: Have Role?, 2: Form
     const [appData, setAppData] = useState({});
 
+    // Backup Profile State (Single User)
+    const [loadedProfile, setLoadedProfile] = useState(null);
+
     // Bio Editing State
     const [isBioEditing, setIsBioEditing] = useState(false);
     const [bioInput, setBioInput] = useState('');
@@ -73,15 +76,20 @@ const Dashboard = ({ user, onSignOut }) => {
 
     // Derived Permissions helpers
     const getUserRank = (targetUser = user) => {
-        const foundUser = users.find(u => u.email === targetUser?.email);
+        // Fallback: If targetUser is current user, try to use loadedProfile if not found in users array
+        let foundUser = users.find(u => u.email === targetUser?.email);
+        if (!foundUser && targetUser?.email === user?.email && loadedProfile) {
+            foundUser = loadedProfile;
+        }
+
         const rankId = foundUser?.rank || 'common';
         const rankObj = availableRanks.find(r => r.id === rankId) || availableRanks.find(r => r.id === 'common');
         return { ...rankObj, sub_rank: foundUser?.sub_rank };
     };
 
 
-    // Helper to get current profile from users array
-    const currentProfile = users.find(u => u.id === user?.id);
+    // Helper to get current profile from users array OR loaded backup
+    const currentProfile = users.find(u => u.id === user?.id) || loadedProfile;
 
     const currentRank = getUserRank(user);
     const isPoseidon = user?.email === 'dipanshumaheshwari73698@gmail.com';
@@ -111,6 +119,7 @@ const Dashboard = ({ user, onSignOut }) => {
 
             // A. Upsert Profile
             const { data: currentProfile, error: profileFetchError } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+            if (currentProfile) setLoadedProfile(currentProfile);
 
             const isTableMissingError = (err) => err && (err.code === '42P01' || err.code === 'PGRST205' || err.message?.includes('404') || err.message?.includes('Could not find the table'));
             if (isTableMissingError(profileFetchError)) { setSetupRequired(true); return; }
