@@ -550,11 +550,68 @@ const Dashboard = ({ user, onSignOut }) => {
                                 </div>
                             </div>
                         )}
+
+                        {/* RANK LIBRARY INTERACTIVE */}
                         {activeSection === 'ranks' && (
-                            <div className="p-10 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md flex flex-wrap gap-4 justify-center">
-                                {availableRanks.map(rank => <div key={rank.id} className={`p-4 border ${rank.border} rounded-xl text-center`}><h4 className={rank.text}>{rank.label}</h4><p className="text-xs text-gray-400 max-w-[200px] mt-2">{rank.desc}</p></div>)}
+                            <div className="min-h-[60vh]">
+                                {viewingRank ? (
+                                    <div className="animate-fade-in-up">
+                                        <button onClick={() => setViewingRank(null)} className="mb-8 flex items-center gap-2 text-gray-400 hover:text-white transition-colors group">
+                                            <span className="group-hover:-translate-x-1 transition-transform">←</span> Back to Library
+                                        </button>
+
+                                        <div className={`p-10 rounded-3xl bg-white/5 border ${viewingRank.border} backdrop-blur-md relative overflow-hidden`}>
+                                            <div className={`absolute top-0 right-0 w-96 h-96 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none opacity-20 ${viewingRank.color.split(' ')[1]}`}></div>
+
+                                            <div className="relative z-10">
+                                                <h3 className={`text-5xl font-bold mb-4 ${viewingRank.text} tracking-tight`}>{viewingRank.label}</h3>
+                                                <p className="text-xl text-white/80 font-light tracking-wide mb-8 max-w-2xl">{viewingRank.desc}</p>
+
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-12 border-t border-white/10 pt-8">
+                                                    <div>
+                                                        <h4 className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-4">Requirements</h4>
+                                                        <p className="text-gray-300 leading-relaxed">{viewingRank.req}</p>
+                                                    </div>
+
+                                                    {viewingRank.subCategories && (
+                                                        <div>
+                                                            <h4 className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-4">Hierarchical Structure</h4>
+                                                            <div className="space-y-4">
+                                                                {viewingRank.subCategories.map((sub, idx) => (
+                                                                    <div key={idx} className="p-4 rounded-xl bg-black/20 border border-white/5 hover:border-white/20 transition-all">
+                                                                        <div className="flex items-center justify-between mb-1">
+                                                                            <span className={`font-bold ${sub.color}`}>{sub.name}</span>
+                                                                            <span className="text-[10px] uppercase text-gray-500 tracking-wider">{sub.title}</span>
+                                                                        </div>
+                                                                        <p className="text-sm text-gray-400">{sub.desc}</p>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="p-10 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md flex flex-wrap gap-6 justify-center">
+                                        {availableRanks.map(rank => (
+                                            <div
+                                                key={rank.id}
+                                                onClick={() => setViewingRank(rank)}
+                                                className={`p-6 border ${rank.border} rounded-2xl text-center w-64 hover:scale-105 transition-all duration-300 cursor-pointer group bg-black/20 hover:bg-white/5 relative overflow-hidden`}
+                                            >
+                                                <div className={`absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 bg-gradient-to-br ${rank.color.split(' ')[1] ? rank.color.split(' ')[1].replace('bg-', 'from-') + ' to-transparent' : 'from-white to-transparent'}`}></div>
+                                                <h4 className={`text-xl font-bold mb-2 ${rank.text} group-hover:drop-shadow-[0_0_10px_rgba(255,255,255,0.5)] transition-all`}>{rank.label}</h4>
+                                                <p className="text-xs text-gray-400 group-hover:text-gray-300 line-clamp-2">{rank.desc}</p>
+                                                <div className="mt-4 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] uppercase tracking-widest text-white/50">View Details</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         )}
+
                         {activeSection === 'events' && <div className="text-center text-gray-500 py-20">Events Module Loading...</div>}
                         {activeSection === 'about' && <div className="text-center text-gray-500 py-20">About Module Loading...</div>}
                         {activeSection === 'photography' && <div className="text-center text-gray-500 py-20">Photography Module Loading...</div>}
