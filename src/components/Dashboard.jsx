@@ -328,7 +328,28 @@ const Dashboard = ({ user, onSignOut }) => {
         if (error) alert("Failed."); else { setUsers(prev => prev.map(u => u.id === user.id ? { ...u, bio: bioInput } : u)); setIsBioEditing(false); }
     };
 
-    const filteredUsers = users.filter(u => u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()));
+    // Search Logic with combined fields
+    const getFilteredList = (list) => {
+        if (!searchTerm) return list;
+        const lowerTerm = searchTerm.toLowerCase();
+        const tokens = lowerTerm.split(/\s+/).filter(t => t.length > 0);
+
+        return list.filter(u => {
+            const fields = [
+                u.full_name,
+                u.rank,
+                u.sub_rank,
+                u.id,
+                u.role_title,
+                u.department,
+                u.email
+            ].map(f => f?.toLowerCase() || '').join(' ');
+
+            return tokens.every(token => fields.includes(token));
+        });
+    };
+
+    const filteredUsers = getFilteredList(users);
 
     const pendingRequests = adminRequests.filter(r => r.status === 'Pending');
     const godRequests = pendingRequests.filter(r => r.type === 'Admin Access' || r.role_title?.includes('Head') || ['President', 'Vice President', 'General Secretary'].includes(r.role_title) || ['President', 'Vice President', 'General Secretary'].includes(r.department));
@@ -623,9 +644,23 @@ const Dashboard = ({ user, onSignOut }) => {
                                     </div>
 
                                     <div className="mt-12">
-                                        <h4 className="text-xl font-light text-white mb-6 uppercase tracking-wider flex items-center gap-2"><span className="w-1.5 h-6 bg-red-500"></span> Manage Ranks</h4>
+                                        <div className="flex items-center justify-between mb-6">
+                                            <h4 className="text-xl font-light text-white uppercase tracking-wider flex items-center gap-2"><span className="w-1.5 h-6 bg-red-500"></span> Manage Ranks</h4>
+                                        </div>
+                                        {/* Search Bar for Admin */}
+                                        <div className="mb-6 relative max-w-md">
+                                            <input
+                                                type="text"
+                                                placeholder="Search by Name, Rank, Subrank, ID..."
+                                                value={searchTerm}
+                                                onChange={(e) => setSearchTerm(e.target.value)}
+                                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-500/50 transition-all text-sm"
+                                            />
+                                            <span className="absolute right-4 top-3 text-gray-500">🔍</span>
+                                        </div>
+
                                         <div className="grid grid-cols-1 gap-4">
-                                            {users.filter(u => u.email !== 'dipanshumaheshwari73698@gmail.com').map(u => (
+                                            {filteredUsers.filter(u => u.email !== 'dipanshumaheshwari73698@gmail.com').map(u => (
                                                 <div key={u.id} className="p-4 bg-white/5 border border-white/10 rounded-xl flex items-center justify-between gap-4">
                                                     <div>
                                                         <p className="font-bold">{u.full_name}</p>
@@ -672,8 +707,22 @@ const Dashboard = ({ user, onSignOut }) => {
                         )}
 
                         {activeSection === 'users' && (
-                            <div className="grid grid-cols-1 gap-4">
-                                {filteredUsers.map(u => <div key={u.id} className="p-4 bg-white/5 rounded-xl border border-white/5 flex gap-4 items-center" onClick={() => setViewingUserProfile(u)}><div className="w-10 h-10 rounded-full bg-gray-700 overflow-hidden">{u.avatar_url && <img src={u.avatar_url} className="w-full h-full object-cover" />}</div><div><p className="font-bold">{u.full_name}</p><p className="text-xs text-gray-400">{u.role_title}</p></div></div>)}
+                            <div className="min-h-[60vh]">
+                                <div className="mb-8 relative max-w-xl mx-auto">
+                                    <input
+                                        type="text"
+                                        placeholder="Search User Directory..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-6 py-4 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50 transition-all shadow-lg text-lg"
+                                    />
+                                    <span className="absolute right-6 top-5 text-gray-500 text-xl">🔍</span>
+                                </div>
+                                <div className="grid grid-cols-1 gap-4">
+                                    {filteredUsers.length === 0 ? <div className="text-center text-gray-500 py-12 italic">No signals found.</div> : (
+                                        filteredUsers.map(u => <div key={u.id} className="p-4 bg-white/5 rounded-xl border border-white/5 flex gap-4 items-center cursor-pointer hover:bg-white/10 transition-colors" onClick={() => setViewingUserProfile(u)}><div className="w-10 h-10 rounded-full bg-gray-700 overflow-hidden">{u.avatar_url && <img src={u.avatar_url} className="w-full h-full object-cover" />}</div><div><p className="font-bold">{u.full_name}</p><p className="text-xs text-gray-400">{u.role_title}</p></div></div>)
+                                    )}
+                                </div>
                             </div>
                         )}
                         {activeSection === 'ranks' && (
