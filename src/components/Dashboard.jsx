@@ -68,7 +68,7 @@ const Dashboard = ({ user, onSignOut }) => {
     const ROLE_OPTIONS = [
         "President", "Distinguished Alumni", "Research Team",
         "Vice President", "General Secretary",
-        "Tech", "Finance", "Content", "Design", "Webdev", "Telescope Handler", "PR & Branding", "Astrophotography Head"
+        "Tech", "Finance", "Content", "Design", "Webdev", "Telescope Handler", "PR & Branding", "Astrophotography"
     ];
 
     const DEPARTMENTS = [
