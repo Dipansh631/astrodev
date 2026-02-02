@@ -214,7 +214,17 @@ const Dashboard = ({ user, onSignOut }) => {
     const handleAppSubmit = async () => {
         const isVerification = appData.hasRole;
         const type = isVerification ? "Role Verification" : "Job Application";
-        const roleTitle = appData.position || (DEPARTMENTS.includes(appData.selectedRole) ? 'Member' : 'Officer'); // "Member" is auto-selected if in Department list unless hasRole overrides it
+        // If applying for a role/dept, use the selected role itself as the title if it's not a generic department
+        // For actual departments (Tech, Design etc), default to 'Member' unless specified.
+        // For single roles like President, the selectedRole IS the title.
+        let roleTitle = appData.roleTitle;
+        if (!roleTitle) {
+            if (DEPARTMENTS.includes(appData.selectedRole)) {
+                roleTitle = 'Member';
+            } else {
+                roleTitle = appData.selectedRole; // President, VP, etc.
+            }
+        }
 
         const payload = {
             user_id: user.id,
@@ -291,6 +301,19 @@ const Dashboard = ({ user, onSignOut }) => {
         if (error) alert("Failed."); else setUsers(prev => prev.map(u => u.id === userId ? { ...u, rank: newRankId, sub_rank: subRank } : u));
     };
 
+    const handleRoleChange = async (userId, newDept, newRoleTitle) => {
+        if (!isGod) { alert("Only Gods can assign roles."); return; }
+        const targetUser = users.find(u => u.id === userId);
+        if (targetUser?.email === 'dipanshumaheshwari73698@gmail.com' && !isPoseidon) { alert("Thou shall not alter the Creator."); return; }
+
+        const { error } = await supabase.from('profiles').update({ department: newDept, role_title: newRoleTitle }).eq('id', userId);
+        if (error) {
+            alert("Failed to update role: " + error.message);
+        } else {
+            setUsers(prev => prev.map(u => u.id === userId ? { ...u, department: newDept, role_title: newRoleTitle } : u));
+        }
+    };
+
     const handleDeleteUser = async (userId) => {
         if (!isGod) return;
         if (!confirm("Are you sure?")) return;
@@ -308,7 +331,7 @@ const Dashboard = ({ user, onSignOut }) => {
     const filteredUsers = users.filter(u => u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const pendingRequests = adminRequests.filter(r => r.status === 'Pending');
-    const godRequests = pendingRequests.filter(r => r.type === 'Admin Access' || r.role_title?.includes('Head'));
+    const godRequests = pendingRequests.filter(r => r.type === 'Admin Access' || r.role_title?.includes('Head') || ['President', 'Vice President', 'General Secretary'].includes(r.role_title) || ['President', 'Vice President', 'General Secretary'].includes(r.department));
     const memberRequests = pendingRequests.filter(r => r.role_title === 'Member');
 
     const headClusterRequests = pendingRequests.filter(r => (r.role_title === 'Member') && (r.department === userDept || isGod));
@@ -456,21 +479,74 @@ const Dashboard = ({ user, onSignOut }) => {
                         {activeSection === 'profile' && (
                             <div className="flex flex-col gap-12">
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
-                                    {/* Simplified Profile Card for brevity, functionally identical */}
-                                    <div className="p-10 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md relative overflow-hidden group">
-                                        <div className="relative z-10 flex flex-col md:flex-row items-center gap-8">
-                                            <div className="w-36 h-36 rounded-full overflow-hidden border-4 border-black bg-black">{user.user_metadata.avatar_url && <img src={user.user_metadata.avatar_url} className="w-full h-full object-cover" />}</div>
-                                            <div>
-                                                <h3 className="text-3xl font-bold">{user?.user_metadata?.full_name}</h3>
-                                                <p className="text-gray-400">{user?.email}</p>
-                                                <span className={`inline-block mt-2 px-6 py-2 rounded-full border text-xs font-bold uppercase ${currentRank.color} ${currentRank.border}`}>{currentRank.label}</span>
+                                    <div className="p-10 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md relative overflow-hidden group hover:border-white/20 transition-all duration-500">
+                                        <div className={`absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none opacity-20 ${currentRank?.color.split(' ')[1]}`}></div>
+                                        <div className="flex flex-col md:flex-row items-center gap-8 relative z-10">
+                                            <div className={`w-36 h-36 rounded-full p-1 bg-gradient-to-tr shadow-2xl relative ${currentRank?.id === 'god' ? 'from-yellow-400 via-red-500 to-purple-600' : 'from-gray-700 to-gray-900'}`}>
+                                                <div className="w-full h-full rounded-full overflow-hidden bg-black border-4 border-black relative">
+                                                    {user?.user_metadata?.avatar_url ? <img src={user.user_metadata.avatar_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-4xl">🧑‍🚀</div>}
+                                                </div>
+                                            </div>
+                                            <div className="text-center md:text-left">
+                                                <h3 className="text-3xl font-bold text-white mb-2 tracking-tight">
+                                                    {user?.email === 'dipanshumaheshwari73698@gmail.com' ? 'Dipanshu The Creator' : (user?.user_metadata?.full_name || 'Anonymous Traveler')}
+                                                </h3>
+                                                <p className="text-gray-400 font-mono text-sm mb-4">{user?.email}</p>
+                                                {currentRank && (
+                                                    <div className="flex flex-col gap-2">
+                                                        <span className={`inline-flex items-center justify-center px-6 py-2 ${currentRank.id === 'god' ? 'bg-red-900/20 border-red-500/50 shadow-red-500/40' : currentRank.color + ' border ' + currentRank.border + ' ' + currentRank.shadow} border rounded-full font-bold text-xs tracking-[0.2em] uppercase`}>
+                                                            {currentRank.sub_rank ? currentRank.sub_rank : currentRank.label}
+                                                        </span>
+                                                        {(currentProfile?.department || currentProfile?.role_title) && (
+                                                            <span className="text-[10px] text-cyan-300 uppercase tracking-widest bg-cyan-900/20 px-3 py-1 rounded-full border border-cyan-500/30">
+                                                                {currentProfile?.role_title || 'Member'} @ {currentProfile?.department || 'General'}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
+                                        <div className="mt-10 grid grid-cols-2 gap-4 border-t border-white/10 pt-6">
+                                            <div className="p-4 rounded-2xl bg-black/20 text-center"><span className="block text-gray-400 text-xs uppercase tracking-widest mb-1">Joined</span><span className="text-lg font-mono text-white">{new Date(user?.created_at).toLocaleDateString()}</span></div>
+                                            <div className="p-4 rounded-2xl bg-black/20 text-center"><span className="block text-gray-400 text-xs uppercase tracking-widest mb-1">Status</span><span className="text-lg font-mono text-green-400">Active</span></div>
+                                        </div>
                                     </div>
+
+                                    {/* BIO & ACHIEVEMENTS */}
                                     <div className="flex flex-col gap-6">
-                                        <div className="p-8 rounded-3xl bg-white/5 border border-white/10 h-full">
-                                            <div className="flex justify-between mb-6"><h3>Transmission Log</h3><button onClick={() => isBioEditing ? handleBioSave() : setIsBioEditing(true)} className="text-blue-400 text-xs uppercase font-bold">{isBioEditing ? 'Save' : 'Edit'}</button></div>
-                                            {isBioEditing ? <textarea className="w-full bg-black/30 p-4 rounded text-gray-300" value={bioInput} onChange={e => setBioInput(e.target.value)} /> : <p className="text-gray-400 italic">{currentProfile?.bio || "No log."}</p>}
+                                        {/* Introduce Yourself */}
+                                        <div className="flex-1 p-8 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md hover:border-white/20 transition-all flex flex-col min-h-[250px]">
+                                            <div className="flex justify-between items-center mb-6">
+                                                <h3 className="text-xl font-bold text-white flex items-center gap-3"><span className="w-2 h-8 bg-blue-500 rounded-full"></span>Transmission Log</h3>
+                                                <button onClick={() => isBioEditing ? handleBioSave() : setIsBioEditing(true)} className="text-xs uppercase font-bold tracking-wider text-blue-400 hover:text-white transition-colors">
+                                                    {isBioEditing ? 'Save Log' : 'Edit Log'}
+                                                </button>
+                                            </div>
+                                            {isBioEditing ? (
+                                                <textarea
+                                                    className="w-full h-full bg-black/30 border border-white/10 rounded-xl p-4 text-gray-300 focus:outline-none focus:border-blue-500/50 resize-none min-h-[150px]"
+                                                    value={bioInput}
+                                                    onChange={(e) => setBioInput(e.target.value)}
+                                                    placeholder="Write your signal to the universe..."
+                                                />
+                                            ) : (
+                                                <div className="space-y-4 pl-4 border-l border-white/10 ml-1 h-full">
+                                                    <p className="text-gray-400 italic leading-relaxed whitespace-pre-wrap">
+                                                        {currentProfile?.bio || "No transmission recorded. The galaxy awaits your story."}
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Achievements Placeholder */}
+                                        <div className="p-8 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md">
+                                            <h4 className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-6 border-b border-white/5 pb-2">Achievement Badges</h4>
+                                            <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
+                                                <div className="group relative shrink-0"><div className="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-500/20 to-orange-600/20 border border-yellow-500/30 flex items-center justify-center text-xl grayscale group-hover:grayscale-0 transition-all duration-300 cursor-help shadow-lg" title="Early Adopter">🥚</div></div>
+                                                {currentRank?.id === 'god' && <div className="group relative shrink-0"><div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500/20 to-purple-600/20 border border-red-500/30 flex items-center justify-center text-xl cursor-help shadow-lg" title="God Tier">🔱</div></div>}
+                                                {(currentProfile?.role_title === 'Head' || currentRank?.id === 'legendary') && <div className="group relative shrink-0"><div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-600/20 border border-blue-500/30 flex items-center justify-center text-xl cursor-help shadow-lg" title="Department Head">💠</div></div>}
+                                                <div className="group relative shrink-0 opacity-30"><div className="w-12 h-12 rounded-xl border border-white/10 flex items-center justify-center text-xl">🔒</div></div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -551,10 +627,42 @@ const Dashboard = ({ user, onSignOut }) => {
                                         <div className="grid grid-cols-1 gap-4">
                                             {users.filter(u => u.email !== 'dipanshumaheshwari73698@gmail.com').map(u => (
                                                 <div key={u.id} className="p-4 bg-white/5 border border-white/10 rounded-xl flex items-center justify-between gap-4">
-                                                    <div><p className="font-bold">{u.full_name}</p><p className="text-xs text-blue-400">{u.rank}</p></div>
-                                                    <div className="flex gap-2"><select className="bg-black border border-white/20 text-xs p-1" value={u.rank || 'common'} onChange={(e) => handleAssignTag(u.id, e.target.value)}>
-                                                        {availableRanks.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
-                                                    </select><button onClick={() => handleDeleteUser(u.id)}>🗑️</button></div>
+                                                    <div>
+                                                        <p className="font-bold">{u.full_name}</p>
+                                                        <p className="text-xs text-blue-400">{u.rank}{u.sub_rank ? ` (${u.sub_rank})` : ''}</p>
+                                                    </div>
+                                                    <div className="flex gap-2 items-center flex-wrap justify-end">
+                                                        <input
+                                                            className="bg-black/50 border border-white/10 text-xs p-1 rounded w-24 text-gray-300 placeholder-gray-600"
+                                                            placeholder="Role Title"
+                                                            defaultValue={u.role_title || ''}
+                                                            onBlur={(e) => handleRoleChange(u.id, u.department, e.target.value)}
+                                                        />
+                                                        <select
+                                                            className="bg-black border border-white/20 text-xs p-1 rounded w-24"
+                                                            value={u.department || 'General'}
+                                                            onChange={(e) => handleRoleChange(u.id, e.target.value, u.role_title)}
+                                                        >
+                                                            <option value="General">General</option>
+                                                            {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                                                            <option value="President">President</option>
+                                                            <option value="Vice President">Vice President</option>
+                                                        </select>
+
+                                                        <div className="h-4 w-[1px] bg-white/10 mx-1"></div>
+
+                                                        <select className="bg-black border border-white/20 text-xs p-1 rounded" value={u.rank || 'common'} onChange={(e) => handleAssignTag(u.id, e.target.value, u.sub_rank)}>
+                                                            {availableRanks.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
+                                                        </select>
+                                                        {u.rank === 'god' && (
+                                                            <select className="bg-black border border-yellow-500/50 text-yellow-500 text-xs p-1 rounded" value={u.sub_rank || ''} onChange={(e) => handleAssignTag(u.id, 'god', e.target.value)}>
+                                                                <option value="">- Sub Rank -</option>
+                                                                <option value="Zeus">Zeus</option>
+                                                                <option value="Apollo">Apollo</option>
+                                                            </select>
+                                                        )}
+                                                        <button onClick={() => handleDeleteUser(u.id)} className="text-red-500 hover:text-red-400 px-2">🗑️</button>
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
@@ -568,7 +676,71 @@ const Dashboard = ({ user, onSignOut }) => {
                                 {filteredUsers.map(u => <div key={u.id} className="p-4 bg-white/5 rounded-xl border border-white/5 flex gap-4 items-center" onClick={() => setViewingUserProfile(u)}><div className="w-10 h-10 rounded-full bg-gray-700 overflow-hidden">{u.avatar_url && <img src={u.avatar_url} className="w-full h-full object-cover" />}</div><div><p className="font-bold">{u.full_name}</p><p className="text-xs text-gray-400">{u.role_title}</p></div></div>)}
                             </div>
                         )}
-                        {activeSection === 'ranks' && (viewingRank ? <div>Rank Details... <button onClick={() => setViewingRank(null)}>Back</button></div> : <div className="flex gap-4 flex-wrap">{availableRanks.map(r => <div key={r.id} onClick={() => setViewingRank(r)} className="p-4 bg-white/5 rounded border border-white/10 cursor-pointer">{r.label}</div>)}</div>)}
+                        {activeSection === 'ranks' && (
+                            <div className="min-h-[60vh]">
+                                {viewingRank ? (
+                                    <div className="animate-fade-in-up">
+                                        <button onClick={() => setViewingRank(null)} className="mb-8 flex items-center gap-2 text-gray-400 hover:text-white transition-colors group">
+                                            <span className="group-hover:-translate-x-1 transition-transform">←</span> Back to Library
+                                        </button>
+
+                                        <div className={`p-10 rounded-3xl bg-white/5 border ${viewingRank.border} backdrop-blur-md relative overflow-hidden`}>
+                                            <div className={`absolute top-0 right-0 w-96 h-96 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none opacity-20 ${viewingRank.color.split(' ')[1]}`}></div>
+
+                                            <div className="relative z-10">
+                                                <h3 className={`text-5xl font-bold mb-4 ${viewingRank.text} tracking-tight`}>{viewingRank.label}</h3>
+                                                <p className="text-xl text-white/80 font-light tracking-wide mb-8 max-w-2xl">{viewingRank.desc}</p>
+
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-12 border-t border-white/10 pt-8">
+                                                    <div>
+                                                        <h4 className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-4">Requirements</h4>
+                                                        <p className="text-gray-300 leading-relaxed border-l-2 border-white/20 pl-4">{viewingRank.req}</p>
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-4">Privileges</h4>
+                                                        <ul className="space-y-2">
+                                                            <li className="flex items-center gap-3 text-gray-300"><span className="w-1.5 h-1.5 bg-green-400 rounded-full"></span>Access to {viewingRank.id === 'god' ? 'Command Center' : 'General Channels'}</li>
+                                                            <li className="flex items-center gap-3 text-gray-300"><span className="w-1.5 h-1.5 bg-green-400 rounded-full"></span>{viewingRank.id === 'god' ? 'Full System Control' : 'Standard Voting Rights'}</li>
+                                                        </ul>
+                                                    </div>
+                                                </div>
+
+                                                {viewingRank.subCategories && (
+                                                    <div className="mt-12">
+                                                        <h4 className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-6">Sub-Classes (The Trinity)</h4>
+                                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                            {viewingRank.subCategories.map(sub => (
+                                                                <div key={sub.name} className="p-4 bg-black/20 rounded-xl border border-white/5">
+                                                                    <div className={`font-bold ${sub.color} mb-1`}>{sub.name}</div>
+                                                                    <div className="text-xs text-gray-400 uppercase tracking-wider mb-2">{sub.title}</div>
+                                                                    <p className="text-xs text-gray-500">{sub.desc}</p>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                                        {availableRanks.map(rank => (
+                                            <button key={rank.id} onClick={() => setViewingRank(rank)} className={`group relative p-8 rounded-3xl bg-white/5 border border-white/5 hover:border-white/20 transition-all text-left overflow-hidden ${rank.id === 'degradation' ? 'opacity-50 hover:opacity-100' : ''}`}>
+                                                <div className={`absolute top-0 right-0 w-32 h-32 rounded-full blur-2xl -mr-16 -mt-16 transition-opacity opacity-0 group-hover:opacity-20 ${rank.color.split(' ')[1]}`}></div>
+                                                <div className="relative z-10">
+                                                    <div className={`text-2xl font-bold mb-2 ${rank.text} tracking-widest`}>{rank.label}</div>
+                                                    <p className="text-sm text-gray-400 line-clamp-2">{rank.desc}</p>
+                                                    <div className="mt-6 flex items-center gap-2 text-xs uppercase tracking-widest text-gray-600 group-hover:text-white transition-colors">
+                                                        <span>View Details</span>
+                                                        <span className="group-hover:translate-x-1 transition-transform">→</span>
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {activeSection === 'photography' && <Astrophotography isAstroHead={isAstroHead} isGod={isGod} />}
                         {activeSection === 'studio' && isAstroPrivileged && <AstroStudio user={user} />}
