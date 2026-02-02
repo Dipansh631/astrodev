@@ -1,21 +1,25 @@
 -- -----------------------------------------------------------------------------
--- SQL PERMISSIONS FIX: Features Expansion (Roles & Applications)
--- Run this to enable the new Role Application System & Department Routing
+-- SQL PERMISSIONS FIX: Bio Feature
+-- Run this to enable the new Bio column
 -- -----------------------------------------------------------------------------
 
 -- 0. Ensure Schema Exists
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS sub_rank text;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS department text;
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS role_title text; -- e.g. "Head", "Member"
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS role_title text;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS bio text; -- New Bio Column
 
 ALTER TABLE public.admin_requests ADD COLUMN IF NOT EXISTS department text;
 ALTER TABLE public.admin_requests ADD COLUMN IF NOT EXISTS role_title text;
-ALTER TABLE public.admin_requests ADD COLUMN IF NOT EXISTS request_data jsonb; -- Flexible storage for application form data
+ALTER TABLE public.admin_requests ADD COLUMN IF NOT EXISTS request_data jsonb;
 
 -- 1. Drop complex policies to reset (Safety Clear)
 drop policy if exists "Gods can update any profile" on public.profiles;
 drop policy if exists "Gods can view all requests" on public.admin_requests;
 drop policy if exists "Gods can update requests" on public.admin_requests;
+drop policy if exists "Authorized users can view requests" on public.admin_requests;
+drop policy if exists "Authorized users can update requests" on public.admin_requests;
+drop policy if exists "Users can update own bio" on public.profiles;
 
 -- 2. Create Broad Policies for ALL GODS & DEPARTMENT HEADS
 
@@ -29,10 +33,13 @@ create policy "Gods can update any profile"
     (select rank from public.profiles where id = auth.uid()) = 'god'
   );
 
+-- USER BIO UPDATE (Everyone can update their own bio)
+create policy "Users can update own bio"
+    on public.profiles for update
+    using ( auth.uid() = id )
+    with check ( auth.uid() = id );
+
 -- REQUEST VISIBILITY (Select)
--- 1. User sees own requests
--- 2. Gods see ALL requests
--- 3. Heads (Elite/Legendary) see requests for THEIR department
 create policy "Authorized users can view requests"
   on public.admin_requests for select
   using ( 

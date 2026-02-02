@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 
 const SelectionMenu = ({ onAdminRegister, onRoleApply, isLocked, isAdmin }) => {
@@ -23,8 +22,6 @@ const SelectionMenu = ({ onAdminRegister, onRoleApply, isLocked, isAdmin }) => {
                 onAdminRegister();
                 setRequestStatus(prev => ({ ...prev, admin: true }));
             }
-        } else if (label === "Register as Member") {
-            window.open("https://forms.google.com/member-registration", "_blank");
         } else if (label === "Apply for Role in Club") {
             if (onRoleApply) {
                 onRoleApply();
@@ -43,7 +40,6 @@ const SelectionMenu = ({ onAdminRegister, onRoleApply, isLocked, isAdmin }) => {
                 ? "ACCESS LOCKED: POSITIONS FILLED"
                 : (requestStatus.admin ? "Request Sent to Poseidon" : null)
         },
-        { label: "Register as Member", color: "from-purple-500 to-pink-500" },
         { label: "Apply for Role in Club", color: "from-amber-500 to-orange-500" }
     ];
 

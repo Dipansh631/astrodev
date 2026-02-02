@@ -12,7 +12,7 @@ const Dashboard = ({ user, onSignOut }) => {
     const [viewingRank, setViewingRank] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
 
-    // Data State (Replaces mockUsers)
+    // Data State
     const [users, setUsers] = useState([]);
     const [adminRequests, setAdminRequests] = useState([]);
 
@@ -20,6 +20,10 @@ const Dashboard = ({ user, onSignOut }) => {
     const [isAppModalOpen, setIsAppModalOpen] = useState(false);
     const [appStep, setAppStep] = useState(1); // 1: Have Role?, 2: Form
     const [appData, setAppData] = useState({});
+
+    // Bio Editing State
+    const [isBioEditing, setIsBioEditing] = useState(false);
+    const [bioInput, setBioInput] = useState('');
 
     // System State
     const [setupRequired, setSetupRequired] = useState(false);
@@ -62,7 +66,7 @@ const Dashboard = ({ user, onSignOut }) => {
         "Tech", "Finance", "Content", "Design", "Webdev", "Telescope Handler", "PR & Branding"
     ];
 
-    // Derived Permissions helpers must be after Rank Defs or inside component
+    // Derived Permissions helpers
     const getUserRank = (targetUser = user) => {
         const foundUser = users.find(u => u.email === targetUser?.email);
         const rankId = foundUser?.rank || 'common';
@@ -72,8 +76,16 @@ const Dashboard = ({ user, onSignOut }) => {
 
     const currentRank = getUserRank(user);
     const isPoseidon = user?.email === 'dipanshumaheshwari73698@gmail.com';
-    const isGod = currentRank?.id === 'god';
+    const isGod = currentRank?.id === 'god' || isPoseidon;
     const PROJECT_ID = 'zcrqbyszzadtdghcxpvl';
+
+    // Helper to get current profile from users array
+    const currentProfile = users.find(u => u.id === user?.id);
+
+    // Init bio input when profile loads
+    useEffect(() => {
+        if (currentProfile?.bio) setBioInput(currentProfile.bio);
+    }, [currentProfile?.bio]);
 
     // --------------------------------------------------------------------------------
     // 1. Fetch Data on Mount
@@ -108,7 +120,6 @@ const Dashboard = ({ user, onSignOut }) => {
             if (allProfiles) setUsers(allProfiles);
 
             // C. Fetch Admin Requests
-            // Use RLS to filter visibility automatically
             const { data: requests, error: reqError } = await supabase.from('admin_requests').select('*').order('created_at', { ascending: false });
             if (!reqError) setAdminRequests(requests || []);
         };
@@ -125,10 +136,9 @@ const Dashboard = ({ user, onSignOut }) => {
     const refreshData = () => { window.location.reload(); };
 
     // --------------------------------------------------------------------------------
-    // Setup Screen (Skipped strict DB check for brevity, kept mainly for missing table)
+    // Setup Screen
     // --------------------------------------------------------------------------------
     if (setupRequired || constraintError) {
-        // ... (Keep existing setup component logic fully)
         const scriptToShow = constraintError ? SQL_FIX_CONSTRAINT : SQL_SETUP_SCRIPT;
         return (
             <div className="w-full h-full min-h-screen bg-black flex items-center justify-center p-8 relative overflow-hidden">
@@ -164,12 +174,9 @@ const Dashboard = ({ user, onSignOut }) => {
     };
 
     const handleAppSubmit = async () => {
-        // Construct Payload
         const isVerification = appData.hasRole;
         const type = isVerification ? "Role Verification" : "Job Application";
         const roleTitle = appData.position || (DEPARTMENTS.includes(appData.selectedRole) ? 'Member' : 'Officer');
-        // If user selected a Department in verification, they specify Head/Member.
-        // If user selected a Core Role (Pres), position is Officer.
 
         const payload = {
             user_id: user.id,
@@ -177,9 +184,9 @@ const Dashboard = ({ user, onSignOut }) => {
             full_name: user?.user_metadata?.full_name || 'Anonymous',
             type: type,
             status: 'Pending',
-            department: appData.selectedRole, // Or mapped department
+            department: appData.selectedRole,
             role_title: appData.roleTitle || roleTitle,
-            request_data: appData // Store full form data
+            request_data: appData
         };
 
         const { error } = await supabase.from('admin_requests').insert([payload]);
@@ -188,10 +195,7 @@ const Dashboard = ({ user, onSignOut }) => {
             console.error(error);
             alert("Failed to submit application: " + error.message);
         } else {
-            alert(isVerification ?
-                "Verification request sent to Zeus Command Center." :
-                `Application submitted to ${appData.selectedRole} Head.`
-            );
+            alert(isVerification ? "Verification request sent to Zeus Command Center." : `Application submitted to ${appData.selectedRole} Head.`);
             setIsAppModalOpen(false);
         }
     };
@@ -200,7 +204,6 @@ const Dashboard = ({ user, onSignOut }) => {
     // Admin Handlers
     // --------------------------------------------------------------------------------
     const handleAdminRegisterRequest = async () => {
-        // ... (Keep existing logic)
         const { error } = await supabase.from('admin_requests').insert([{
             user_id: user.id, email: user.email, full_name: user.user_metadata?.full_name || 'Anonymous',
             type: 'Admin Access', status: 'Pending'
@@ -210,22 +213,16 @@ const Dashboard = ({ user, onSignOut }) => {
     };
 
     const handleApprove = async (reqId, subRank = 'Zeus') => {
-        // This is primarily for Admin Access requests, but can be adapted
         const req = adminRequests.find(r => r.id === reqId);
         if (!req) return;
 
-        // If it's Role Verification or Job App, we approve slightly differently
         if (req.type === 'Admin Access') {
-            // ... existing logic
             const { error } = await supabase.from('admin_requests').update({ status: 'Approved' }).eq('id', reqId);
             if (!error) await supabase.from('profiles').update({ rank: 'god', sub_rank: subRank }).eq('id', req.user_id);
             setAdminRequests(prev => prev.map(r => r.id === reqId ? { ...r, status: 'Approved' } : r));
         } else {
-            // Role Approval
             const { error } = await supabase.from('admin_requests').update({ status: 'Approved' }).eq('id', reqId);
             if (!error) {
-                // Determine new rank based on role
-                // If 'Head' -> Legendary. If 'Member' -> Rare. If 'President' -> Elite.
                 let newRank = 'common';
                 if (req.role_title === 'Head' || req.department === 'Vice President' || req.department === 'General Secretary') newRank = 'legendary';
                 else if (req.department === 'President' || req.department === 'Distinguished Alumni') newRank = 'elite';
@@ -251,17 +248,27 @@ const Dashboard = ({ user, onSignOut }) => {
     const handleAssignTag = async (userId, newRankId, subRank = null) => {
         if (!isGod) { alert("Only Gods can assign tags."); return; }
         const targetUser = users.find(u => u.id === userId);
-        if (targetUser?.email === 'dipanshumaheshwari73698@gmail.com') { alert("Thou shall not alter the Creator."); return; }
+        if (targetUser?.email === 'dipanshumaheshwari73698@gmail.com' && !isPoseidon) { alert("Thou shall not alter the Creator."); return; }
         const { error } = await supabase.from('profiles').update({ rank: newRankId, sub_rank: subRank }).eq('id', userId);
         if (error) alert("Failed."); else {
             setUsers(prev => prev.map(u => u.id === userId ? { ...u, rank: newRankId, sub_rank: subRank } : u));
         }
     };
 
+    const handleBioSave = async () => {
+        if (!user) return;
+        const { error } = await supabase.from('profiles').update({ bio: bioInput }).eq('id', user.id);
+        if (error) {
+            alert("Failed to save transmission log.");
+        } else {
+            setUsers(prev => prev.map(u => u.id === user.id ? { ...u, bio: bioInput } : u));
+            setIsBioEditing(false);
+        }
+    };
+
     const filteredUsers = users.filter(u => u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()));
     const pendingRequests = adminRequests.filter(r => r.status === 'Pending');
 
-    // UI RENDER
     return (
         <div className="w-full h-full bg-transparent text-white font-sans overflow-hidden relative flex">
             {/* Modal for Application */}
@@ -269,7 +276,6 @@ const Dashboard = ({ user, onSignOut }) => {
                 <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
                     <div className="bg-[#0a0a0a] border border-white/20 p-8 rounded-2xl max-w-md w-full shadow-2xl relative">
                         <button onClick={() => setIsAppModalOpen(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white">✕</button>
-
                         {appStep === 1 && (
                             <div className="text-center space-y-6">
                                 <h3 className="text-2xl font-bold text-white uppercase tracking-wider">Role Verification</h3>
@@ -280,50 +286,29 @@ const Dashboard = ({ user, onSignOut }) => {
                                 </div>
                             </div>
                         )}
-
                         {appStep === 2 && (
                             <div className="space-y-6">
                                 <h3 className="text-xl font-bold text-white uppercase tracking-wider mb-4 border-b border-white/10 pb-2">
                                     {appData.hasRole ? "Verify Your Position" : "Apply for Membership"}
                                 </h3>
-
                                 <div>
                                     <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Select Department / Role</label>
-                                    <select
-                                        className="w-full bg-white/5 border border-white/20 rounded-lg p-3 text-white focus:border-blue-500 outline-none"
-                                        onChange={(e) => setAppData({ ...appData, selectedRole: e.target.value })}
-                                    >
+                                    <select className="w-full bg-white/5 border border-white/20 rounded-lg p-3 text-white focus:border-blue-500 outline-none"
+                                        onChange={(e) => setAppData({ ...appData, selectedRole: e.target.value })}>
                                         <option value="">-- Select --</option>
-                                        {appData.hasRole
-                                            ? ROLE_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)
-                                            : DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)
-                                        }
+                                        {appData.hasRole ? ROLE_OPTIONS.map(r => <option key={r} value={r}>{r}</option>) : DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
                                     </select>
                                 </div>
-
                                 {DEPARTMENTS.includes(appData.selectedRole) && (
                                     <div>
                                         <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Your Position</label>
                                         <div className="flex gap-4">
-                                            <label className="flex items-center gap-2 cursor-pointer">
-                                                <input type="radio" name="pos" value="Head" onChange={(e) => setAppData({ ...appData, roleTitle: 'Head' })} />
-                                                <span className="text-sm">Head</span>
-                                            </label>
-                                            <label className="flex items-center gap-2 cursor-pointer">
-                                                <input type="radio" name="pos" value="Member" onChange={(e) => setAppData({ ...appData, roleTitle: 'Member' })} />
-                                                <span className="text-sm">Member</span>
-                                            </label>
+                                            <label className="flex items-center gap-2 cursor-pointer"><input type="radio" name="pos" value="Head" onChange={(e) => setAppData({ ...appData, roleTitle: 'Head' })} /><span className="text-sm">Head</span></label>
+                                            <label className="flex items-center gap-2 cursor-pointer"><input type="radio" name="pos" value="Member" onChange={(e) => setAppData({ ...appData, roleTitle: 'Member' })} /><span className="text-sm">Member</span></label>
                                         </div>
                                     </div>
                                 )}
-
-                                <button
-                                    onClick={handleAppSubmit}
-                                    disabled={!appData.selectedRole}
-                                    className="w-full py-3 bg-white text-black font-bold uppercase tracking-widest rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    Submit Application
-                                </button>
+                                <button onClick={handleAppSubmit} disabled={!appData.selectedRole} className="w-full py-3 bg-white text-black font-bold uppercase tracking-widest rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Submit Application</button>
                             </div>
                         )}
                     </div>
@@ -335,19 +320,9 @@ const Dashboard = ({ user, onSignOut }) => {
             <aside className={`fixed top-0 left-0 h-full w-80 z-[150] bg-white/0 backdrop-blur-xl border-r border-white/5 transform transition-transform duration-500 ease-in-out ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col pt-28 pb-8`}>
                 <div className="px-8 mb-8"><div className="text-xl font-light tracking-[0.2em] text-cyan-300 uppercase opacity-80">Content Table</div></div>
                 <nav className="flex-1 w-full flex flex-col gap-6 px-6 overflow-y-auto no-scrollbar">
-                    {[
-                        { id: 'profile', label: 'My Profile' },
-                        { id: 'admin', label: 'Command Center' },
-                        { id: 'ranks', label: 'Rank Library' },
-                        { id: 'users', label: 'User Directory' },
-                        { id: 'photography', label: 'Astro Photography' },
-                        { id: 'events', label: 'Events & Activities' },
-                        { id: 'about', label: 'About Club' },
-                        { id: 'register', label: 'Registration' },
-                    ].map((section) => (
+                    {[{ id: 'profile', label: 'My Profile' }, { id: 'admin', label: 'Command Center' }, { id: 'ranks', label: 'Rank Library' }, { id: 'users', label: 'User Directory' }, { id: 'photography', label: 'Astro Photography' }, { id: 'events', label: 'Events & Activities' }, { id: 'about', label: 'About Club' }, { id: 'register', label: 'Registration' }].map((section) => (
                         <button key={section.id} onClick={() => handleSectionClick(section.id)} className={`w-full text-left px-6 py-2 rounded-xl text-lg tracking-wide font-light transition-all duration-300 ${activeSection === section.id ? 'text-white border-l-2 border-white pl-8 shadow-[0_0_20px_rgba(255,255,255,0.1)]' : 'text-gray-400 hover:text-white hover:pl-8 border-l-2 border-transparent'} flex items-center justify-between group`}>
-                            <span>{section.label}</span>
-                            {section.id === 'admin' && !isGod && <span className="text-sm opacity-50 group-hover:opacity-100 transition-opacity">🔒</span>}
+                            <span>{section.label}</span>{section.id === 'admin' && !isGod && <span className="text-sm opacity-50 group-hover:opacity-100 transition-opacity">🔒</span>}
                         </button>
                     ))}
                 </nav>
@@ -381,21 +356,144 @@ const Dashboard = ({ user, onSignOut }) => {
                                                 </h3>
                                                 <p className="text-gray-400 font-mono text-sm mb-4">{user?.email}</p>
                                                 {currentRank && (
-                                                    <span className={`inline-flex items-center px-6 py-2 ${currentRank.id === 'god' ? 'bg-red-900/20 border-red-500/50 shadow-red-500/40' : currentRank.color + ' border ' + currentRank.border + ' ' + currentRank.shadow} border rounded-full font-bold text-xs tracking-[0.2em] uppercase`}>
-                                                        {currentRank.sub_rank ? currentRank.sub_rank : currentRank.label}
-                                                    </span>
+                                                    <div className="flex flex-col gap-2">
+                                                        <span className={`inline-flex items-center justify-center px-6 py-2 ${currentRank.id === 'god' ? 'bg-red-900/20 border-red-500/50 shadow-red-500/40' : currentRank.color + ' border ' + currentRank.border + ' ' + currentRank.shadow} border rounded-full font-bold text-xs tracking-[0.2em] uppercase`}>
+                                                            {currentRank.sub_rank ? currentRank.sub_rank : currentRank.label}
+                                                        </span>
+                                                        {(currentProfile?.department || currentProfile?.role_title) && (
+                                                            <span className="text-[10px] text-cyan-300 uppercase tracking-widest bg-cyan-900/20 px-3 py-1 rounded-full border border-cyan-500/30">
+                                                                {currentProfile?.role_title || 'Member'} @ {currentProfile?.department || 'General'}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 )}
                                             </div>
                                         </div>
+                                        <div className="mt-10 grid grid-cols-2 gap-4 border-t border-white/10 pt-6">
+                                            <div className="p-4 rounded-2xl bg-black/20 text-center"><span className="block text-gray-400 text-xs uppercase tracking-widest mb-1">Joined</span><span className="text-lg font-mono text-white">{new Date(user?.created_at).toLocaleDateString()}</span></div>
+                                            <div className="p-4 rounded-2xl bg-black/20 text-center"><span className="block text-gray-400 text-xs uppercase tracking-widest mb-1">Status</span><span className="text-lg font-mono text-green-400">Active</span></div>
+                                        </div>
                                     </div>
-                                    {/* Additional Profile Info */}
+
+                                    {/* BIO & ACHIEVEMENTS */}
+                                    <div className="flex flex-col gap-6">
+                                        {/* Introduce Yourself */}
+                                        <div className="flex-1 p-8 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md hover:border-white/20 transition-all flex flex-col min-h-[250px]">
+                                            <div className="flex justify-between items-center mb-6">
+                                                <h3 className="text-xl font-bold text-white flex items-center gap-3"><span className="w-2 h-8 bg-blue-500 rounded-full"></span>Transmission Log</h3>
+                                                <button onClick={() => isBioEditing ? handleBioSave() : setIsBioEditing(true)} className="text-xs uppercase font-bold tracking-wider text-blue-400 hover:text-white transition-colors">
+                                                    {isBioEditing ? 'Save Log' : 'Edit Log'}
+                                                </button>
+                                            </div>
+                                            {isBioEditing ? (
+                                                <textarea
+                                                    className="w-full h-full bg-black/30 border border-white/10 rounded-xl p-4 text-gray-300 focus:outline-none focus:border-blue-500/50 resize-none min-h-[150px]"
+                                                    value={bioInput}
+                                                    onChange={(e) => setBioInput(e.target.value)}
+                                                    placeholder="Write your signal to the universe..."
+                                                />
+                                            ) : (
+                                                <div className="space-y-4 pl-4 border-l border-white/10 ml-1 h-full">
+                                                    <p className="text-gray-400 italic leading-relaxed whitespace-pre-wrap">
+                                                        {currentProfile?.bio || "No transmission recorded. The galaxy awaits your story."}
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Achievements Placeholder */}
+                                        <div className="p-8 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md">
+                                            <h4 className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-6 border-b border-white/5 pb-2">Achievement Badges</h4>
+                                            <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
+                                                <div className="group relative shrink-0"><div className="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-500/20 to-orange-600/20 border border-yellow-500/30 flex items-center justify-center text-xl grayscale group-hover:grayscale-0 transition-all duration-300 cursor-help shadow-lg">🥚</div></div>
+                                                {currentRank?.id === 'god' && <div className="group relative shrink-0"><div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500/20 to-purple-600/20 border border-red-500/30 flex items-center justify-center text-xl cursor-help shadow-lg">🔱</div></div>}
+                                                {(currentProfile?.role_title === 'Head' || currentRank?.id === 'legendary') && <div className="group relative shrink-0"><div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-600/20 border border-blue-500/30 flex items-center justify-center text-xl cursor-help shadow-lg">💠</div></div>}
+                                                <div className="group relative shrink-0 opacity-30"><div className="w-12 h-12 rounded-xl border border-white/10 flex items-center justify-center text-xl">🔒</div></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* USER DIRECTORY SPLIT */}
+                        {activeSection === 'users' && (
+                            <div className="space-y-12">
+                                <div className="p-8 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md">
+                                    <h3 className="text-2xl font-light text-white mb-2">User Directory</h3>
+                                    <input type="text" placeholder="Search explorer..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full mt-4 px-6 py-3 rounded-full bg-black/30 border border-white/10 text-white focus:outline-none focus:border-blue-500/50" />
+                                </div>
+
+                                {/* SECTION 1: MEMBERS (God to Rare, except Event Winners from Epic) */}
+                                <div>
+                                    <h4 className="text-xl font-light text-cyan-300 mb-6 uppercase tracking-[0.2em] flex items-center gap-3">
+                                        <span className="w-1.5 h-6 bg-cyan-500"></span> Currently Member of AstroClub
+                                    </h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {filteredUsers.filter(u => {
+                                            const r = u.rank || 'common';
+                                            // God, Elite, Legendary, Rare are always members
+                                            if (['god', 'elite', 'legendary', 'rare'].includes(r)) return true;
+                                            // Epic: Include ONLY if PR & Branding (explicit member team from description)
+                                            if (r === 'epic') {
+                                                if (u.department === 'PR & Branding') return true;
+                                                return false; // Assume Event Winner
+                                            }
+                                            return false;
+                                        }).map(u => {
+                                            const uRankData = getUserRank(u);
+                                            return (
+                                                <div key={u.id} className="p-4 rounded-xl bg-cyan-900/10 border border-cyan-500/20 flex items-center justify-between gap-4 hover:bg-cyan-900/20 transition-all">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center overflow-hidden border border-white/10">
+                                                            {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" /> : '🚀'}
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="font-bold text-white text-sm">{u.full_name}</h4>
+                                                            <p className="text-[10px] text-gray-400 uppercase tracking-wider">{u.role_title || u.department || 'Member'}</p>
+                                                        </div>
+                                                    </div>
+                                                    <span className={`px-3 py-1 rounded-full text-[9px] font-bold border ${uRankData.color} ${uRankData.border} text-white uppercase`}>
+                                                        {uRankData.sub_rank || uRankData.label}
+                                                    </span>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* SECTION 2: ALL USERS (Everyone, but emphasized for Community) */}
+                                <div>
+                                    <h4 className="text-xl font-light text-gray-400 mb-6 uppercase tracking-[0.2em] flex items-center gap-3">
+                                        <span className="w-1.5 h-6 bg-gray-600"></span> Galactic Community
+                                    </h4>
+                                    <div className="flex flex-col gap-4">
+                                        {filteredUsers.map(u => {
+                                            const uRankData = getUserRank(u);
+                                            return (
+                                                <div key={u.id} className="p-4 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between gap-4">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center overflow-hidden opacity-70">
+                                                            {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" /> : '👤'}
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="font-bold text-gray-300 text-sm">{u.full_name}</h4>
+                                                            <p className="text-[10px] text-gray-600">{u.email}</p>
+                                                        </div>
+                                                    </div>
+                                                    <span className={`px-3 py-1 rounded-full text-[9px] font-bold border ${uRankData.color} ${uRankData.border} text-white opacity-80 uppercase`}>
+                                                        {uRankData.sub_rank || uRankData.label}
+                                                    </span>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
                                 </div>
                             </div>
                         )}
 
                         {activeSection === 'admin' && isGod && (
                             <div className="space-y-8 min-h-[60vh]">
-                                {/* Request Panel */}
                                 <div>
                                     <h4 className="text-xl font-light text-white mb-6 uppercase tracking-wider flex items-center gap-2">
                                         <span className="w-1.5 h-6 bg-red-500"></span> Pending Requests
@@ -412,7 +510,6 @@ const Dashboard = ({ user, onSignOut }) => {
                                                     {req.role_title && <p className="text-sm text-yellow-500 mt-1">Applying for: {req.role_title}</p>}
                                                 </div>
                                                 <div className="flex gap-2 mt-4">
-                                                    {/* Dynamic Actions based on Type */}
                                                     {req.type === 'Admin Access' ? (
                                                         <>
                                                             <button onClick={() => handleApprove(req.id, 'Zeus')} className="flex-1 py-2 bg-yellow-500/10 text-yellow-500 rounded border border-yellow-500/20 hover:bg-yellow-500/20 text-xs font-bold">Approve Zeus</button>
@@ -427,7 +524,6 @@ const Dashboard = ({ user, onSignOut }) => {
                                         ))}
                                     </div>
                                 </div>
-                                {/* Rank Managment is below */}
                                 <div className="mt-12">
                                     <h4 className="text-xl font-light text-white mb-6 uppercase tracking-wider flex items-center gap-2"><span className="w-1.5 h-6 bg-red-500"></span> Manage Ranks</h4>
                                     <div className="grid grid-cols-1 gap-4">
@@ -454,31 +550,9 @@ const Dashboard = ({ user, onSignOut }) => {
                                 </div>
                             </div>
                         )}
-                        {/* Other sections ... */}
                         {activeSection === 'ranks' && (
                             <div className="p-10 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md flex flex-wrap gap-4 justify-center">
                                 {availableRanks.map(rank => <div key={rank.id} className={`p-4 border ${rank.border} rounded-xl text-center`}><h4 className={rank.text}>{rank.label}</h4><p className="text-xs text-gray-400 max-w-[200px] mt-2">{rank.desc}</p></div>)}
-                            </div>
-                        )}
-                        {activeSection === 'users' && (
-                            <div className="space-y-8">
-                                <div className="p-8 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md"><h3 className="text-2xl font-light text-white mb-2">User Directory</h3>
-                                    <input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full mt-4 px-6 py-3 rounded-full bg-black/30 border border-white/10 text-white" />
-                                </div>
-                                <div className="flex flex-col gap-4">
-                                    {filteredUsers.map(u => {
-                                        const uRankData = getUserRank(u);
-                                        return (
-                                            <div key={u.id} className="p-6 rounded-2xl bg-white/5 border border-white/5 flex flex-col md:flex-row items-center justify-between gap-6">
-                                                <div className="flex items-center gap-6">
-                                                    <div className="w-14 h-14 rounded-full bg-gray-800 flex items-center justify-center overflow-hidden">{u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" /> : '🚀'}</div>
-                                                    <div><h4 className="font-bold text-white">{u.full_name}</h4><p className="text-xs text-gray-500">{u.role_title ? `${u.role_title} @ ${u.department}` : u.email}</p></div>
-                                                </div>
-                                                <div className="flex items-center gap-4"><span className={`px-4 py-1.5 rounded-full text-[10px] font-bold border ${uRankData.color} ${uRankData.border} text-white`}>{uRankData.sub_rank || uRankData.label}</span></div>
-                                            </div>
-                                        )
-                                    })}
-                                </div>
                             </div>
                         )}
                         {activeSection === 'events' && <div className="text-center text-gray-500 py-20">Events Module Loading...</div>}
