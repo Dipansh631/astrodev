@@ -13,6 +13,7 @@ const Dashboard = ({ user, onSignOut }) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [viewingRank, setViewingRank] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [viewingUserProfile, setViewingUserProfile] = useState(null);
 
     // Data State
     const [users, setUsers] = useState([]);
@@ -310,6 +311,9 @@ const Dashboard = ({ user, onSignOut }) => {
     const filteredUsers = users.filter(u => u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()));
     const pendingRequests = adminRequests.filter(r => r.status === 'Pending');
 
+    // Public Profile Viewer State should be at the top with other hooks, not here.
+    // I will remove it from here and add it to the top.
+
     return (
         <div className="w-full h-full bg-transparent text-white font-sans overflow-hidden relative flex">
             {/* Modal for Application */}
@@ -355,6 +359,69 @@ const Dashboard = ({ user, onSignOut }) => {
                     </div>
                 </div>
             )}
+
+            {/* Profile Viewer Modal */}
+            {viewingUserProfile && (() => {
+                const uRankData = getUserRank(viewingUserProfile);
+                const isGodUser = uRankData.id === 'god';
+                return (
+                    <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in-up">
+                        <div className="bg-[#0a0a0a] border border-white/20 p-0 rounded-3xl max-w-2xl w-full shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh]">
+                            <button onClick={() => setViewingUserProfile(null)} className="absolute top-4 right-4 z-50 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-white/20 transition-all">✕</button>
+
+                            <div className="relative p-8 pb-0">
+                                <div className={`absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none opacity-20 ${uRankData.color.split(' ')[1]}`}></div>
+                                <div className="flex flex-col md:flex-row items-center gap-8 relative z-10">
+                                    <div className={`w-36 h-36 rounded-full p-1 bg-gradient-to-tr shadow-2xl shrink-0 ${isGodUser ? 'from-yellow-400 via-red-500 to-purple-600' : 'from-gray-700 to-gray-900'}`}>
+                                        <div className="w-full h-full rounded-full overflow-hidden bg-black border-4 border-black relative">
+                                            {viewingUserProfile.avatar_url ? <img src={viewingUserProfile.avatar_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-4xl">🧑‍🚀</div>}
+                                        </div>
+                                    </div>
+                                    <div className="text-center md:text-left">
+                                        <h3 className="text-3xl font-bold text-white mb-2 tracking-tight">
+                                            {viewingUserProfile.full_name || 'Anonymous Traveler'}
+                                        </h3>
+                                        {/* Rank Badge */}
+                                        <div className="flex flex-col gap-2 items-center md:items-start">
+                                            <span className={`inline-flex items-center justify-center px-6 py-2 ${isGodUser ? 'bg-red-900/20 border-red-500/50 shadow-red-500/40' : uRankData.color + ' border ' + uRankData.border + ' ' + uRankData.shadow} border rounded-full font-bold text-xs tracking-[0.2em] uppercase`}>
+                                                {uRankData.sub_rank ? uRankData.sub_rank : uRankData.label}
+                                            </span>
+                                            {(viewingUserProfile.department || viewingUserProfile.role_title) && (
+                                                <span className="text-[10px] text-cyan-300 uppercase tracking-widest bg-cyan-900/20 px-3 py-1 rounded-full border border-cyan-500/30">
+                                                    {viewingUserProfile.role_title || 'Member'} @ {viewingUserProfile.department || 'General'}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-8 overflow-y-auto">
+                                {/* Bio Section */}
+                                <div className="mb-8">
+                                    <h4 className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-4 border-b border-white/5 pb-2">Transmission Log</h4>
+                                    <p className="text-gray-300 italic leading-relaxed whitespace-pre-wrap pl-4 border-l-2 border-white/10">
+                                        {viewingUserProfile.bio || "No transmission recorded."}
+                                    </p>
+                                </div>
+
+                                {/* Achievements */}
+                                <div>
+                                    <h4 className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-4 border-b border-white/5 pb-2">Badges & Identifiers</h4>
+                                    <div className="flex gap-4">
+                                        <div className="p-3 bg-white/5 rounded-xl border border-white/10 text-center min-w-[80px]">
+                                            <div className="text-gray-400 text-[10px] uppercase tracking-wider mb-1">ID Ref</div>
+                                            <div className="font-mono text-xs text-blue-400">#{viewingUserProfile.id.substring(0, 6)}</div>
+                                        </div>
+                                        {isGodUser && <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500/20 to-purple-600/20 border border-red-500/30 flex items-center justify-center text-xl shadow-lg" title="God Tier">🔱</div>}
+                                        {(viewingUserProfile.role_title === 'Head' || uRankData.id === 'legendary') && <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-600/20 border border-blue-500/30 flex items-center justify-center text-xl shadow-lg" title="Legendary">💠</div>}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
 
             <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="fixed top-6 left-6 z-[200] p-2 rounded-lg bg-white/5 backdrop-blur-md border border-white/10 hover:bg-white/10 transition-all text-2xl shadow-[0_0_15px_rgba(255,255,255,0.1)]">{isMenuOpen ? '✕' : '☰'}</button>
 
@@ -486,20 +553,20 @@ const Dashboard = ({ user, onSignOut }) => {
                                         }).map(u => {
                                             const uRankData = getUserRank(u);
                                             return (
-                                                <div key={u.id} className="p-4 rounded-xl bg-cyan-900/10 border border-cyan-500/20 flex items-center justify-between gap-4 hover:bg-cyan-900/20 transition-all">
+                                                <button onClick={() => setViewingUserProfile(u)} key={u.id} className="w-full p-4 rounded-xl bg-cyan-900/10 border border-cyan-500/20 flex items-center justify-between gap-4 hover:bg-cyan-900/20 transition-all text-left group">
                                                     <div className="flex items-center gap-4">
-                                                        <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center overflow-hidden border border-white/10">
+                                                        <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center overflow-hidden border border-white/10 group-hover:border-cyan-400/50 transition-colors">
                                                             {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" /> : '🚀'}
                                                         </div>
                                                         <div>
-                                                            <h4 className="font-bold text-white text-sm">{u.full_name}</h4>
+                                                            <h4 className="font-bold text-white text-sm group-hover:text-cyan-300 transition-colors">{u.full_name}</h4>
                                                             <p className="text-[10px] text-gray-400 uppercase tracking-wider">{u.role_title || u.department || 'Member'}</p>
                                                         </div>
                                                     </div>
                                                     <span className={`px-3 py-1 rounded-full text-[9px] font-bold border ${uRankData.color} ${uRankData.border} text-white uppercase`}>
                                                         {uRankData.sub_rank || uRankData.label}
                                                     </span>
-                                                </div>
+                                                </button>
                                             )
                                         })}
                                     </div>
@@ -514,20 +581,20 @@ const Dashboard = ({ user, onSignOut }) => {
                                         {filteredUsers.map(u => {
                                             const uRankData = getUserRank(u);
                                             return (
-                                                <div key={u.id} className="p-4 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between gap-4">
+                                                <button onClick={() => setViewingUserProfile(u)} key={u.id} className="w-full p-4 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between gap-4 hover:bg-white/10 transition-all text-left group">
                                                     <div className="flex items-center gap-4">
-                                                        <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center overflow-hidden opacity-70">
+                                                        <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center overflow-hidden opacity-70 border border-transparent group-hover:border-white/30 transition-all">
                                                             {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" /> : '👤'}
                                                         </div>
                                                         <div>
-                                                            <h4 className="font-bold text-gray-300 text-sm">{u.full_name}</h4>
-                                                            <p className="text-[10px] text-gray-600">{u.email}</p>
+                                                            <h4 className="font-bold text-gray-300 text-sm group-hover:text-white transition-colors">{u.full_name}</h4>
+                                                            <p className="text-[10px] text-gray-600 group-hover:text-gray-500">{u.email}</p>
                                                         </div>
                                                     </div>
                                                     <span className={`px-3 py-1 rounded-full text-[9px] font-bold border ${uRankData.color} ${uRankData.border} text-white opacity-80 uppercase`}>
                                                         {uRankData.sub_rank || uRankData.label}
                                                     </span>
-                                                </div>
+                                                </button>
                                             )
                                         })}
                                     </div>
