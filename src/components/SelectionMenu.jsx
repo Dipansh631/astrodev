@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 
-const SelectionMenu = ({ onAdminRegister, isLocked, isAdmin }) => {
+const SelectionMenu = ({ onAdminRegister, onRoleApply, isLocked, isAdmin }) => {
     // Add local state to track request status for the session
     const [requestStatus, setRequestStatus] = useState({
         admin: false, // false: not sent, true: sent
@@ -26,7 +26,11 @@ const SelectionMenu = ({ onAdminRegister, isLocked, isAdmin }) => {
         } else if (label === "Register as Member") {
             window.open("https://forms.google.com/member-registration", "_blank");
         } else if (label === "Apply for Role in Club") {
-            window.open("https://forms.google.com/role-application", "_blank");
+            if (onRoleApply) {
+                onRoleApply();
+            } else {
+                alert("Role application system is currently offline.");
+            }
         }
     };
 
