@@ -98,7 +98,11 @@ const Dashboard = ({ user, onSignOut }) => {
 
     // Check permissions for Astro Studio
     // User must be God OR (Department='Astrophotography' AND Rank IN ['elite', 'legendary'])
-    const isAstroHead = ((currentProfile?.department === 'Astrophotography' || currentProfile?.department === 'Astrophotography Head') && (currentRank.id === 'elite' || currentRank.id === 'legendary'));
+    const isAstroHead = (
+        (currentProfile?.department === 'Astrophotography' && (currentProfile?.role_title === 'Head' || ['elite', 'legendary', 'god'].includes(currentRank?.id))) ||
+        currentProfile?.department === 'Astrophotography Head' ||
+        currentProfile?.role_title === 'Astrophotography Head'
+    );
     const isAstroPrivileged = isGod || isAstroHead;
 
     const PROJECT_ID = 'zcrqbyszzadtdghcxpvl';
@@ -119,7 +123,9 @@ const Dashboard = ({ user, onSignOut }) => {
             const updates = { id: user.id, email: user.email, full_name: user.user_metadata?.full_name || 'Anonymous', avatar_url: user.user_metadata?.avatar_url || '' };
 
             // A. Upsert Profile
-            const { data: currentProfile, error: profileFetchError } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+            // error 409 means multiple rows found, which shouldn't happen with ID primary key but can if RLS is weird.
+            // Using maybeSingle suppresses error if 0 rows, but we want to catch multiple too.
+            const { data: currentProfile, error: profileFetchError } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
             if (currentProfile) setLoadedProfile(currentProfile);
 
             const isTableMissingError = (err) => err && (err.code === '42P01' || err.code === 'PGRST205' || err.message?.includes('404') || err.message?.includes('Could not find the table'));
@@ -294,6 +300,24 @@ const Dashboard = ({ user, onSignOut }) => {
         const { error } = await supabase.from('profiles').update({ rank: newRankId, sub_rank: subRank }).eq('id', userId);
         if (error) alert("Failed."); else {
             setUsers(prev => prev.map(u => u.id === userId ? { ...u, rank: newRankId, sub_rank: subRank } : u));
+        }
+    };
+
+    const handleDeleteUser = async (userId) => {
+        if (!isGod) return;
+        if (!confirm("Are you sure you want to EXILE this user? This cannot be undone.")) return;
+
+        const targetUser = users.find(u => u.id === userId);
+        if (targetUser?.email === 'dipanshumaheshwari73698@gmail.com') { alert("You cannot delete the Creator."); return; }
+
+        // Delete from profiles (Supabase Auth delete usually requires server-side admin API, but we can delete profile data)
+        const { error } = await supabase.from('profiles').delete().eq('id', userId);
+
+        if (error) {
+            alert("Exile failed: " + error.message);
+        } else {
+            alert("User exiled from the database.");
+            setUsers(prev => prev.filter(u => u.id !== userId));
         }
     };
 
@@ -654,6 +678,9 @@ const Dashboard = ({ user, onSignOut }) => {
                                                             <option value="Apollo">Apollo</option>
                                                         </select>
                                                     )}
+                                                    <button onClick={() => handleDeleteUser(u.id)} className="p-2 bg-red-900/20 text-red-500 border border-red-500/30 rounded hover:bg-red-900/40 transition-colors" title="Exile User">
+                                                        🗑️
+                                                    </button>
                                                 </div>
                                             </div>
                                         ))}
