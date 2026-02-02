@@ -50,7 +50,7 @@ const Dashboard = ({ user, onSignOut }) => {
                 { name: 'Poseidon', title: 'The Shaper', desc: 'Master of the deep void', color: 'text-red-500' }
             ]
         },
-        { id: 'elite', label: 'ELITE', color: 'bg-red-900/20', text: 'text-red-400', border: 'border-red-500/50', shadow: 'shadow-red-500/20', desc: 'The Vanguard of the Fleet.', req: 'Reserved for the President, Distinguished Alumni, and Authors of Research Papers.' },
+        { id: 'elite', label: 'ELITE', color: 'bg-red-900/20', text: 'text-red-400', border: 'border-red-500/50', shadow: 'shadow-red-500/20', desc: 'The Vanguard of the Fleet.', req: 'Reserved for the President, Distinguished Alumni, and Research Team.' },
         { id: 'legendary', label: 'LEGENDARY', color: 'bg-orange-800/20', text: 'text-orange-300', border: 'border-orange-500/50', shadow: 'shadow-orange-500/20', desc: 'A Myth Among Stars.', req: 'Held a leading post: Vice President, General Secretary, Tech/Finance/Content/Design/Web Head, or Telescope Handler.' },
         { id: 'epic', label: 'EPIC', color: 'bg-purple-900/20', text: 'text-purple-300', border: 'border-purple-500/50', shadow: 'shadow-purple-500/20', desc: 'Hero of the Void.', req: 'Awarded to Event Winners and the PR & Branding Team.' },
         { id: 'rare', label: 'RARE', color: 'bg-blue-900/20', text: 'text-blue-300', border: 'border-blue-500/50', shadow: 'shadow-blue-500/20', desc: 'Distinguished Explorer.', req: 'Participate actively in events or work under a leadership post.' },
@@ -59,9 +59,9 @@ const Dashboard = ({ user, onSignOut }) => {
     ];
 
     const ROLE_OPTIONS = [
-        "President", "Distinguished Alumni", "Author of Research Paper",
+        "President", "Distinguished Alumni", "Research Team",
         "Vice President", "General Secretary",
-        "Tech", "Finance", "Content", "Design", "Webdev", "Telescope Handler", "PR & Branding"
+        "Tech", "Finance", "Content", "Design", "Webdev", "Telescope Handler", "PR & Branding", "Astrophotography Head"
     ];
 
     const DEPARTMENTS = [
@@ -86,7 +86,7 @@ const Dashboard = ({ user, onSignOut }) => {
 
     // Check permissions for Astro Studio
     // User must be God OR (Department='Astrophotography' AND Rank IN ['elite', 'legendary'])
-    const isAstroHead = (currentProfile?.department === 'Astrophotography' && (currentRank.id === 'elite' || currentRank.id === 'legendary'));
+    const isAstroHead = ((currentProfile?.department === 'Astrophotography' || currentProfile?.department === 'Astrophotography Head') && (currentRank.id === 'elite' || currentRank.id === 'legendary'));
     const isAstroPrivileged = isGod || isAstroHead;
 
     const PROJECT_ID = 'zcrqbyszzadtdghcxpvl';
@@ -234,8 +234,8 @@ const Dashboard = ({ user, onSignOut }) => {
             const { error } = await supabase.from('admin_requests').update({ status: 'Approved' }).eq('id', reqId);
             if (!error) {
                 let newRank = 'common';
-                if (req.role_title === 'Head' || req.department === 'Vice President' || req.department === 'General Secretary') newRank = 'legendary';
-                else if (req.department === 'President' || req.department === 'Distinguished Alumni') newRank = 'elite';
+                if (req.role_title === 'Head' || req.department === 'Vice President' || req.department === 'General Secretary' || req.department === 'Astrophotography Head') newRank = 'legendary';
+                else if (req.department === 'President' || req.department === 'Distinguished Alumni' || req.department === 'Research Team') newRank = 'elite';
                 else if (req.role_title === 'Member') newRank = 'rare';
 
                 await supabase.from('profiles').update({
