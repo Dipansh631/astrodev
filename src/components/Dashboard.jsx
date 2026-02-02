@@ -330,23 +330,48 @@ const Dashboard = ({ user, onSignOut }) => {
 
     // Search Logic with combined fields
     const getFilteredList = (list) => {
-        if (!searchTerm) return list;
-        const lowerTerm = searchTerm.toLowerCase();
-        const tokens = lowerTerm.split(/\s+/).filter(t => t.length > 0);
+        let result = list;
+        if (searchTerm) {
+            const lowerTerm = searchTerm.toLowerCase();
+            const tokens = lowerTerm.split(/\s+/).filter(t => t.length > 0);
+            result = result.filter(u => {
+                const fields = [u.full_name, u.rank, u.sub_rank, u.id, u.role_title, u.department, u.email].map(f => f?.toLowerCase() || '').join(' ');
+                return tokens.every(token => fields.includes(token));
+            });
+        }
+        return result.sort((a, b) => getSortWeight(b) - getSortWeight(a));
+    };
 
-        return list.filter(u => {
-            const fields = [
-                u.full_name,
-                u.rank,
-                u.sub_rank,
-                u.id,
-                u.role_title,
-                u.department,
-                u.email
-            ].map(f => f?.toLowerCase() || '').join(' ');
+    const getSortWeight = (u) => {
+        const r = u.rank || 'common';
+        const s = u.sub_rank;
+        const d = u.department;
+        const rt = u.role_title;
 
-            return tokens.every(token => fields.includes(token));
-        });
+        // Custom Hierarchy
+        if (r === 'god') {
+            if (s === 'Poseidon' || u.email === 'dipanshumaheshwari73698@gmail.com') return 1000;
+            if (s === 'Zeus') return 900;
+            if (s === 'Apollo') return 800;
+            return 700;
+        }
+        if (r === 'elite') {
+            if (d === 'Distinguished Alumni') return 600;
+            if (d === 'President' || rt === 'President') return 590;
+            if (d === 'Research Team' || rt?.includes('Research')) return 580;
+            return 500;
+        }
+        if (r === 'legendary') {
+            if (d === 'Vice President' || rt === 'Vice President') return 400;
+            if (d === 'General Secretary' || rt === 'General Secretary') return 390;
+            if (rt === 'Head' || rt?.includes('Head')) return 380;
+            return 300;
+        }
+        if (r === 'epic') return 200;
+        if (r === 'rare') return 100;
+        if (r === 'common') return 50;
+        if (r === 'degradation') return 0;
+        return 10;
     };
 
     const filteredUsers = getFilteredList(users);
