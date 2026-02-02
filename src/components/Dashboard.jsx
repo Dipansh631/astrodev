@@ -384,7 +384,7 @@ const Dashboard = ({ user, onSignOut }) => {
                                         {appData.hasRole ? ROLE_OPTIONS.map(r => <option key={r} value={r}>{r}</option>) : DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
                                     </select>
                                 </div>
-                                {DEPARTMENTS.includes(appData.selectedRole) && (
+                                {DEPARTMENTS.includes(appData.selectedRole) && appData.hasRole && (
                                     <div>
                                         <label className="block text-xs uppercase tracking-widest text-gray-500 mb-2">Your Position</label>
                                         <div className="flex gap-4">
