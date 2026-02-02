@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import SelectionMenu from './SelectionMenu';
 import { SQL_SETUP_SCRIPT, SQL_FIX_CONSTRAINT } from '../lib/databaseSetup';
+import Astrophotography from './Astrophotography';
+import AstroStudio from './AstroStudio';
 
 const Dashboard = ({ user, onSignOut }) => {
     // Initialize activeSection from session storage if available
@@ -63,7 +65,7 @@ const Dashboard = ({ user, onSignOut }) => {
     ];
 
     const DEPARTMENTS = [
-        "Tech", "Finance", "Content", "Design", "Webdev", "Telescope Handler", "PR & Branding"
+        "Tech", "Finance", "Content", "Design", "Webdev", "Telescope Handler", "PR & Branding", "Astrophotography"
     ];
 
     // Derived Permissions helpers
@@ -74,13 +76,20 @@ const Dashboard = ({ user, onSignOut }) => {
         return { ...rankObj, sub_rank: foundUser?.sub_rank };
     };
 
-    const currentRank = getUserRank(user);
-    const isPoseidon = user?.email === 'dipanshumaheshwari73698@gmail.com';
-    const isGod = currentRank?.id === 'god' || isPoseidon;
-    const PROJECT_ID = 'zcrqbyszzadtdghcxpvl';
 
     // Helper to get current profile from users array
     const currentProfile = users.find(u => u.id === user?.id);
+
+    const currentRank = getUserRank(user);
+    const isPoseidon = user?.email === 'dipanshumaheshwari73698@gmail.com';
+    const isGod = currentRank?.id === 'god' || isPoseidon;
+
+    // Check permissions for Astro Studio
+    // User must be God OR (Department='Astrophotography' AND Rank IN ['elite', 'legendary'])
+    const isAstroHead = (currentProfile?.department === 'Astrophotography' && (currentRank.id === 'elite' || currentRank.id === 'legendary'));
+    const isAstroPrivileged = isGod || isAstroHead;
+
+    const PROJECT_ID = 'zcrqbyszzadtdghcxpvl';
 
     // Init bio input when profile loads
     useEffect(() => {
@@ -156,6 +165,7 @@ const Dashboard = ({ user, onSignOut }) => {
     const changeSection = (id) => { setActiveSection(id); sessionStorage.setItem('dashboardSection', id); }
     const handleSectionClick = (id) => {
         if (id === 'admin' && !isGod) { alert("You are not a god please live in to your earth"); return; }
+        if (id === 'studio' && !isAstroPrivileged) { alert("Access Denied. Restricted Area."); return; }
         changeSection(id); if (window.innerWidth < 768) setIsMenuOpen(false);
     }
 
@@ -320,9 +330,11 @@ const Dashboard = ({ user, onSignOut }) => {
             <aside className={`fixed top-0 left-0 h-full w-80 z-[150] bg-white/0 backdrop-blur-xl border-r border-white/5 transform transition-transform duration-500 ease-in-out ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col pt-28 pb-8`}>
                 <div className="px-8 mb-8"><div className="text-xl font-light tracking-[0.2em] text-cyan-300 uppercase opacity-80">Content Table</div></div>
                 <nav className="flex-1 w-full flex flex-col gap-6 px-6 overflow-y-auto no-scrollbar">
-                    {[{ id: 'profile', label: 'My Profile' }, { id: 'admin', label: 'Command Center' }, { id: 'ranks', label: 'Rank Library' }, { id: 'users', label: 'User Directory' }, { id: 'photography', label: 'Astro Photography' }, { id: 'events', label: 'Events & Activities' }, { id: 'about', label: 'About Club' }, { id: 'register', label: 'Registration' }].map((section) => (
+                    {[{ id: 'profile', label: 'My Profile' }, { id: 'admin', label: 'Command Center' }, { id: 'studio', label: 'Astro Studio' }, { id: 'ranks', label: 'Rank Library' }, { id: 'users', label: 'User Directory' }, { id: 'photography', label: 'Astro Photography' }, { id: 'events', label: 'Events & Activities' }, { id: 'about', label: 'About Club' }, { id: 'register', label: 'Registration' }].map((section) => (
                         <button key={section.id} onClick={() => handleSectionClick(section.id)} className={`w-full text-left px-6 py-2 rounded-xl text-lg tracking-wide font-light transition-all duration-300 ${activeSection === section.id ? 'text-white border-l-2 border-white pl-8 shadow-[0_0_20px_rgba(255,255,255,0.1)]' : 'text-gray-400 hover:text-white hover:pl-8 border-l-2 border-transparent'} flex items-center justify-between group`}>
-                            <span>{section.label}</span>{section.id === 'admin' && !isGod && <span className="text-sm opacity-50 group-hover:opacity-100 transition-opacity">🔒</span>}
+                            <span>{section.label}</span>
+                            {section.id === 'admin' && !isGod && <span className="text-sm opacity-50 group-hover:opacity-100 transition-opacity">🔒</span>}
+                            {section.id === 'studio' && !isAstroPrivileged && <span className="text-sm opacity-50 group-hover:opacity-100 transition-opacity">🚫</span>}
                         </button>
                     ))}
                 </nav>
@@ -614,7 +626,9 @@ const Dashboard = ({ user, onSignOut }) => {
 
                         {activeSection === 'events' && <div className="text-center text-gray-500 py-20">Events Module Loading...</div>}
                         {activeSection === 'about' && <div className="text-center text-gray-500 py-20">About Module Loading...</div>}
-                        {activeSection === 'photography' && <div className="text-center text-gray-500 py-20">Photography Module Loading...</div>}
+
+                        {activeSection === 'photography' && <Astrophotography isAstroHead={isAstroHead} isGod={isGod} />}
+                        {activeSection === 'studio' && isAstroPrivileged && <AstroStudio user={user} />}
 
                         {activeSection === 'register' && (
                             <div className="flex flex-col items-center justify-center min-h-[50vh]">
