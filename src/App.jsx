@@ -17,16 +17,30 @@ function App() {
         return sessionStorage.getItem('appPhase') === 'dashboard' ? 'dashboard' : 'idle'
     })
     const [user, setUser] = useState(null)
+    const [isReturningUser, setIsReturningUser] = useState(false)
     const [isLoading, setIsLoading] = useState(true)
     const sequenceStarted = useRef(false)
+    const fallingTimeout = useRef(null)
+    const blackoutTimeout = useRef(null)
 
     useEffect(() => {
-        const startSequence = (userData) => {
+        const startSequence = async (userData) => {
             if (sequenceStarted.current) return
             sequenceStarted.current = true
 
             console.log("Starting sequence for user:", userData?.email)
             setUser(userData)
+
+            // Check if user is returning (has a profile)
+            try {
+                const { data } = await supabase.from('profiles').select('id').eq('id', userData.id).maybeSingle()
+                if (data) {
+                    console.log("Returning user detected.")
+                    setIsReturningUser(true)
+                }
+            } catch (err) {
+                console.error("Error checking user status:", err)
+            }
 
             // Check if we should skip animation (e.g. on refresh)
             const savedPhase = sessionStorage.getItem('appPhase')
@@ -91,12 +105,16 @@ function App() {
         if (userData) setUser(userData)
         setPhase('falling')
 
+        // Clear existing timeouts
+        if (fallingTimeout.current) clearTimeout(fallingTimeout.current)
+        if (blackoutTimeout.current) clearTimeout(blackoutTimeout.current)
+
         // Schedule blackout after 30 seconds
-        setTimeout(() => {
+        fallingTimeout.current = setTimeout(() => {
             setPhase('blackout')
 
             // Schedule welcome screen after 2 seconds of black
-            setTimeout(() => {
+            blackoutTimeout.current = setTimeout(() => {
                 setPhase('welcome')
             }, 2000)
         }, 30000)
@@ -138,6 +156,20 @@ function App() {
                     Continue
                 </button>
             </div>
+
+            {/* SKIP BUTTON */}
+            {phase === 'falling' && isReturningUser && (
+                <button
+                    onClick={() => {
+                        if (fallingTimeout.current) clearTimeout(fallingTimeout.current)
+                        if (blackoutTimeout.current) clearTimeout(blackoutTimeout.current)
+                        setPhase('welcome')
+                    }}
+                    className="absolute bottom-10 right-10 z-[60] px-6 py-2 bg-white/5 hover:bg-white/10 backdrop-blur-md border border-white/20 rounded-full text-white/70 hover:text-white font-light tracking-widest uppercase text-sm transition-all hover:border-white/40"
+                >
+                    Skip Animation »
+                </button>
+            )}
 
             {/* DASHBOARD OVERLAY */}
             <div
