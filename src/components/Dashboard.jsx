@@ -4,6 +4,7 @@ import SelectionMenu from './SelectionMenu';
 import { SQL_SETUP_SCRIPT, SQL_FIX_CONSTRAINT } from '../lib/databaseSetup';
 import Astrophotography from './Astrophotography';
 import AstroStudio from './AstroStudio';
+import EventsManager from './EventsManager';
 
 const Dashboard = ({ user, onSignOut }) => {
     // Initialize activeSection from session storage if available
@@ -95,6 +96,7 @@ const Dashboard = ({ user, onSignOut }) => {
     const currentRank = getUserRank(user);
     const isPoseidon = user?.email === 'dipanshumaheshwari73698@gmail.com';
     const isGod = currentRank?.id === 'god' || isPoseidon;
+    const isPresident = currentProfile?.department === 'President' || currentProfile?.role_title === 'President';
 
     // Check permissions for Astro Studio
     const isAstroHead = (
@@ -818,6 +820,7 @@ const Dashboard = ({ user, onSignOut }) => {
 
                         {activeSection === 'photography' && <Astrophotography isAstroHead={isAstroHead} isGod={isGod} />}
                         {activeSection === 'studio' && isAstroPrivileged && <AstroStudio user={user} />}
+                        {activeSection === 'events' && <EventsManager user={user} isGod={isGod} isPresident={isPresident} />}
                         {activeSection === 'register' && (
                             <div className="flex flex-col items-center justify-center min-h-[50vh]">
                                 <h3 className="text-3xl font-thin mb-12 tracking-[0.3em] text-center text-white/80 uppercase">Select Your Path</h3>

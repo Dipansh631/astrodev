@@ -22,6 +22,19 @@ function App() {
     const sequenceStarted = useRef(false)
     const fallingTimeout = useRef(null)
     const blackoutTimeout = useRef(null)
+    const [activeEvent, setActiveEvent] = useState(null)
+    const [showEventPopup, setShowEventPopup] = useState(false)
+
+    useEffect(() => {
+        const fetchActiveEvent = async () => {
+            const { data } = await supabase.from('events').select('*').eq('status', 'active').order('created_at', { ascending: false }).limit(1).maybeSingle()
+            if (data) {
+                setActiveEvent(data)
+                setShowEventPopup(true)
+            }
+        }
+        fetchActiveEvent()
+    }, [])
 
     useEffect(() => {
         const startSequence = async (userData) => {
@@ -156,6 +169,42 @@ function App() {
                     Continue
                 </button>
             </div>
+
+            {/* ACTIVE EVENT POPUP */}
+            {phase === 'welcome' && showEventPopup && activeEvent && (
+                <div className="absolute inset-0 z-[45] flex items-end justify-center pb-20 pointer-events-none">
+                    <div className="bg-black/90 border border-purple-500/50 p-6 rounded-2xl max-w-sm w-full mx-4 shadow-[0_0_30px_rgba(168,85,247,0.4)] pointer-events-auto animate-fade-in-up relative mb-20">
+                        <button
+                            onClick={() => setShowEventPopup(false)}
+                            className="absolute -top-3 -right-3 w-8 h-8 bg-white text-black rounded-full font-bold flex items-center justify-center hover:bg-gray-200"
+                        >
+                            ✕
+                        </button>
+                        <div className="flex items-center gap-2 mb-2">
+                            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                            <span className="text-xs text-green-400 uppercase tracking-widest font-bold">Live Transmission</span>
+                        </div>
+                        <h3 className="text-xl font-bold text-white mb-2">{activeEvent.title}</h3>
+                        <p className="text-gray-400 text-sm mb-4 line-clamp-3">{activeEvent.description}</p>
+                        <div className="flex gap-3">
+                            {activeEvent.registration_link && activeEvent.is_registration_open ? (
+                                <a
+                                    href={activeEvent.registration_link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex-1 py-2 bg-purple-600 hover:bg-purple-500 text-white text-center rounded text-sm font-bold uppercase tracking-wider"
+                                >
+                                    Register Now
+                                </a>
+                            ) : (
+                                <button disabled className="flex-1 py-2 bg-gray-700 text-gray-400 text-center rounded text-sm font-bold uppercase tracking-wider cursor-not-allowed">
+                                    Registration Closed
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* SKIP BUTTON */}
             {phase === 'falling' && isReturningUser && (
