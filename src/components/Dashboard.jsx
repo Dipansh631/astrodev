@@ -36,6 +36,11 @@ const Dashboard = ({ user, onSignOut }) => {
     const [isBioEditing, setIsBioEditing] = useState(false);
     const [bioInput, setBioInput] = useState('');
 
+    // Socials State
+    const [socialLinks, setSocialLinks] = useState([]);
+    const [isSocialEditing, setIsSocialEditing] = useState(false);
+    const [newSocial, setNewSocial] = useState({ platform: 'LinkedIn', url: '' });
+
     // Loading State
     const [loading, setLoading] = useState(true);
 
@@ -108,7 +113,14 @@ const Dashboard = ({ user, onSignOut }) => {
 
     useEffect(() => {
         if (currentProfile?.bio) setBioInput(currentProfile.bio);
-    }, [currentProfile?.bio]);
+
+        // Robust sync for social links
+        const links = (currentProfile?.social_links && Array.isArray(currentProfile.social_links))
+            ? currentProfile.social_links
+            : [];
+        // Only update if different to avoid potential loops (though React state handles this mostly)
+        setSocialLinks(links);
+    }, [currentProfile, currentProfile?.bio, currentProfile?.social_links]);
 
     // --------------------------------------------------------------------------------
     // 1. Fetch Data on Mount
@@ -330,6 +342,45 @@ const Dashboard = ({ user, onSignOut }) => {
         if (error) alert("Failed."); else { setUsers(prev => prev.map(u => u.id === user.id ? { ...u, bio: bioInput } : u)); setIsBioEditing(false); }
     };
 
+    const handleSocialAdd = () => {
+        if (!newSocial.url) return;
+        const updated = [...socialLinks, { ...newSocial }];
+        setSocialLinks(updated);
+        setNewSocial({ platform: 'LinkedIn', url: '' });
+    };
+
+    const handleSocialDelete = (index) => {
+        const updated = socialLinks.filter((_, i) => i !== index);
+        setSocialLinks(updated);
+    };
+
+    const handleSocialSave = async () => {
+        // Optimistic Update
+        setUsers(prev => prev.map(u => u.id === user.id ? { ...u, social_links: socialLinks } : u));
+        setIsSocialEditing(false);
+
+        const { error } = await supabase.from('profiles').update({ social_links: socialLinks }).eq('id', user.id);
+        if (error) {
+            alert("Failed to save frequencies: " + error.message);
+            // Revert by re-fetching
+            const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+            if (data) {
+                setUsers(prev => prev.map(u => u.id === user.id ? data : u));
+            }
+        }
+    };
+
+    const getSocialIcon = (platform) => {
+        switch (platform) {
+            case 'LinkedIn': return '💼';
+            case 'Instagram': return '📸';
+            case 'Twitter': return '🐦';
+            case 'GitHub': return '💻';
+            case 'Website': return '🌐';
+            default: return '🔗';
+        }
+    };
+
     // Search Logic with combined fields
     const getFilteredList = (list) => {
         let result = list;
@@ -466,17 +517,29 @@ const Dashboard = ({ user, onSignOut }) => {
                                             {viewingUserProfile.avatar_url ? <img src={viewingUserProfile.avatar_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-4xl">🧑‍🚀</div>}
                                         </div>
                                     </div>
-                                    <div className="text-center md:text-left">
-                                        <h3 className="text-3xl font-bold text-white mb-2 tracking-tight">{viewingUserProfile.full_name || 'Anonymous'}</h3>
-                                        <div className="flex flex-col gap-2 items-center md:items-start">
-                                            <span className={`inline-flex items-center justify-center px-6 py-2 border rounded-full font-bold text-xs tracking-[0.2em] uppercase ${uRankData.color} ${uRankData.border} ${uRankData.shadow}`}>{uRankData.sub_rank || uRankData.label}</span>
-                                            {(viewingUserProfile.department || viewingUserProfile.role_title) && <span className="text-[10px] text-cyan-300 uppercase tracking-widest bg-cyan-900/20 px-3 py-1 rounded-full border border-cyan-500/30">{viewingUserProfile.role_title || 'Member'} @ {viewingUserProfile.department || 'General'}</span>}
-                                        </div>
+                                </div>
+                                <div className="text-center md:text-left">
+                                    <h3 className="text-3xl font-bold text-white mb-2 tracking-tight">{viewingUserProfile.full_name || 'Anonymous'}</h3>
+                                    <div className="flex flex-col gap-2 items-center md:items-start">
+                                        <span className={`inline-flex items-center justify-center px-6 py-2 border rounded-full font-bold text-xs tracking-[0.2em] uppercase ${uRankData.color} ${uRankData.border} ${uRankData.shadow}`}>{uRankData.sub_rank || uRankData.label}</span>
+                                        {(viewingUserProfile.department || viewingUserProfile.role_title) && <span className="text-[10px] text-cyan-300 uppercase tracking-widest bg-cyan-900/20 px-3 py-1 rounded-full border border-cyan-500/30">{viewingUserProfile.role_title || 'Member'} @ {viewingUserProfile.department || 'General'}</span>}
+
+                                        {/* Social Links Viewer */}
+                                        {viewingUserProfile.social_links && Array.isArray(viewingUserProfile.social_links) && (
+                                            <div className="flex gap-2 mt-4 flex-wrap justify-center md:justify-start">
+                                                {viewingUserProfile.social_links.map((link, idx) => (
+                                                    <a key={idx} href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-1 bg-white/10 hover:bg-white/20 rounded-full text-xs text-white transition-all border border-white/10 hover:border-white/30" title={link.platform}>
+                                                        <span>{getSocialIcon(link.platform)}</span>
+                                                        <span className="uppercase tracking-wider font-medium">{link.platform}</span>
+                                                    </a>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
-                            <div className="p-8"><p className="text-gray-300 italic whitespace-pre-wrap">{viewingUserProfile.bio || "No transmission."}</p></div>
                         </div>
+                        <div className="p-8"><p className="text-gray-300 italic whitespace-pre-wrap">{viewingUserProfile.bio || "No transmission."}</p></div>
                     </div>
                 );
             })()}
@@ -587,15 +650,60 @@ const Dashboard = ({ user, onSignOut }) => {
                                         </div>
 
                                         {/* Achievements Placeholder */}
-                                        <div className="p-8 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md">
-                                            <h4 className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-6 border-b border-white/5 pb-2">Achievement Badges</h4>
-                                            <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
-                                                <div className="group relative shrink-0"><div className="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-500/20 to-orange-600/20 border border-yellow-500/30 flex items-center justify-center text-xl grayscale group-hover:grayscale-0 transition-all duration-300 cursor-help shadow-lg" title="Early Adopter">🥚</div></div>
-                                                {currentRank?.id === 'god' && <div className="group relative shrink-0"><div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500/20 to-purple-600/20 border border-red-500/30 flex items-center justify-center text-xl cursor-help shadow-lg" title="God Tier">🔱</div></div>}
-                                                {(currentProfile?.role_title === 'Head' || currentRank?.id === 'legendary') && <div className="group relative shrink-0"><div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-600/20 border border-blue-500/30 flex items-center justify-center text-xl cursor-help shadow-lg" title="Department Head">💠</div></div>}
-                                                <div className="group relative shrink-0 opacity-30"><div className="w-12 h-12 rounded-xl border border-white/10 flex items-center justify-center text-xl">🔒</div></div>
-                                            </div>
+                                    </div>
+
+                                    {/* SOCIAL FREQUENCIES */}
+                                    <div className="p-8 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md">
+                                        <div className="flex justify-between items-center mb-6 border-b border-white/5 pb-2">
+                                            <h4 className="text-xs uppercase tracking-[0.2em] text-gray-500">Social Frequencies</h4>
+                                            <button onClick={() => isSocialEditing ? handleSocialSave() : setIsSocialEditing(true)} className="text-xs uppercase font-bold tracking-wider text-green-400 hover:text-white transition-colors">
+                                                {isSocialEditing ? 'Save Freqs' : 'Edit Freqs'}
+                                            </button>
                                         </div>
+
+                                        {isSocialEditing ? (
+                                            <div className="space-y-4">
+                                                <div className="flex gap-2">
+                                                    <select
+                                                        className="bg-black/30 border border-white/10 rounded px-2 py-1 text-xs text-white outline-none"
+                                                        value={newSocial.platform}
+                                                        onChange={(e) => setNewSocial({ ...newSocial, platform: e.target.value })}
+                                                    >
+                                                        {['LinkedIn', 'Instagram', 'Twitter', 'GitHub', 'Website'].map(p => <option key={p} value={p}>{p}</option>)}
+                                                    </select>
+                                                    <input
+                                                        type="url"
+                                                        className="flex-1 bg-black/30 border border-white/10 rounded px-2 py-1 text-xs text-white outline-none placeholder-gray-600"
+                                                        placeholder="URL..."
+                                                        value={newSocial.url}
+                                                        onChange={(e) => setNewSocial({ ...newSocial, url: e.target.value })}
+                                                    />
+                                                    <button onClick={handleSocialAdd} className="bg-blue-500/20 text-blue-400 px-3 rounded text-xs hover:bg-blue-500/40">+</button>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    {socialLinks.map((link, idx) => (
+                                                        <div key={idx} className="flex items-center justify-between bg-black/20 p-2 rounded border border-white/5">
+                                                            <div className="flex items-center gap-2">
+                                                                <span>{getSocialIcon(link.platform)}</span>
+                                                                <span className="text-xs text-gray-300">{link.platform}</span>
+                                                            </div>
+                                                            <button onClick={() => handleSocialDelete(idx)} className="text-red-500 hover:text-red-300 text-xs">🗑️</button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="flex gap-4 flex-wrap">
+                                                {socialLinks.length === 0 ? <span className="text-xs text-gray-600 italic">No frequencies established.</span> : (
+                                                    socialLinks.map((link, idx) => (
+                                                        <a key={idx} href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-full border border-white/5 hover:border-white/20 transition-all group">
+                                                            <span className="text-lg group-hover:scale-110 transition-transform">{getSocialIcon(link.platform)}</span>
+                                                            <span className="text-xs text-gray-400 group-hover:text-white uppercase tracking-wider">{link.platform}</span>
+                                                        </a>
+                                                    ))
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
