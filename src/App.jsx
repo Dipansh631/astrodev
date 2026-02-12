@@ -261,7 +261,7 @@ function App() {
             {/* Login Interface - Only visible in idle */}
             <div className={`absolute inset-0 z-10 flex items-center justify-center transition-opacity duration-500 ${!isLoading && phase === 'idle' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
                 <div>
-                    <LoginCard onLogin={() => handleLogin()} />
+                    <LoginCard />
                 </div>
             </div>
 

@@ -1,16 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { supabase } from '../lib/supabaseClient';
 
-const LoginCard = ({ onLogin }) => {
-    const [username, setUsername] = useState('');
-    const [password, setPassword] = useState('');
-
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        console.log("Login attempt:", { username, password });
-        if (onLogin) onLogin();
-    };
-
+const LoginCard = () => {
     const handleGoogleLogin = async () => {
         try {
             const { data, error } = await supabase.auth.signInWithOAuth({
@@ -20,8 +11,6 @@ const LoginCard = ({ onLogin }) => {
                 }
             });
             if (error) throw error;
-            // Note: The actual redirect happens here, so onLogin() won't be called immediately.
-            // After redirect, the session will be restored.
         } catch (error) {
             console.error('Error logging in with Google:', error.message);
             alert('Error logging in with Google. Please try again.');
@@ -43,56 +32,7 @@ const LoginCard = ({ onLogin }) => {
                 </h2>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="relative">
-                    <input
-                        type="text"
-                        id="username"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        className="peer w-full px-4 py-3 bg-white/5 border border-white/30 rounded-lg text-white placeholder-transparent focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all"
-                        placeholder="Username"
-                        autoComplete="username"
-                    />
-                    <label
-                        htmlFor="username"
-                        className="absolute left-4 -top-2.5 bg-[#242424]/0 px-1 text-sm text-blue-300 transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-3.5 peer-focus:-top-2.5 peer-focus:text-blue-300 peer-focus:text-sm"
-                    >
-                        Username
-                    </label>
-                </div>
-
-                <div className="relative">
-                    <input
-                        type="password"
-                        id="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="peer w-full px-4 py-3 bg-white/5 border border-white/30 rounded-lg text-white placeholder-transparent focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent transition-all"
-                        placeholder="Password"
-                        autoComplete="current-password"
-                    />
-                    <label
-                        htmlFor="password"
-                        className="absolute left-4 -top-2.5 bg-[#242424]/0 px-1 text-sm text-purple-300 transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-3.5 peer-focus:-top-2.5 peer-focus:text-purple-300 peer-focus:text-sm"
-                    >
-                        Password
-                    </label>
-                </div>
-
-                <button
-                    type="submit"
-                    className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg text-white font-semibold text-lg hover:from-blue-500 hover:to-purple-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transform transition-all active:scale-95 shadow-lg shadow-purple-500/30"
-                >
-                    Enter Orbit
-                </button>
-
-                <div className="flex items-center py-2">
-                    <div className="flex-1 h-px bg-white/20"></div>
-                    <div className="px-4 text-sm text-gray-400">or</div>
-                    <div className="flex-1 h-px bg-white/20"></div>
-                </div>
-
+            <div className="space-y-6">
                 <button
                     type="button"
                     onClick={handleGoogleLogin}
@@ -118,13 +58,10 @@ const LoginCard = ({ onLogin }) => {
                     </svg>
                     Sign in with Google
                 </button>
-            </form>
-
-            <p className="mt-6 text-center text-gray-400 text-sm">
-                Forgot your coordinates? <a href="#" className="text-blue-400 hover:text-blue-300">Reset Navigation</a>
-            </p>
+            </div>
         </div>
     );
 };
 
 export default LoginCard;
+
