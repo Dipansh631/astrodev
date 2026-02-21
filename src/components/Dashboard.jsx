@@ -5,6 +5,7 @@ import { SQL_SETUP_SCRIPT, SQL_FIX_CONSTRAINT } from '../lib/databaseSetup';
 import Astrophotography from './Astrophotography';
 import AstroStudio from './AstroStudio';
 import EventsManager from './EventsManager';
+import AboutClub from './AboutClub';
 
 const Dashboard = ({ user, onSignOut }) => {
     // Initialize activeSection from session storage if available
@@ -546,19 +547,40 @@ const Dashboard = ({ user, onSignOut }) => {
 
             <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="fixed top-6 left-6 z-[200] p-2 rounded-lg bg-white/5 backdrop-blur-md border border-white/10 hover:bg-white/10 text-2xl shadow-[0_0_15px_rgba(255,255,255,0.1)]">{isMenuOpen ? '✕' : '☰'}</button>
 
-            <aside className={`fixed top-0 left-0 h-full w-80 z-[150] bg-white/0 backdrop-blur-xl border-r border-white/5 transform transition-transform duration-500 ease-in-out ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col pt-28 pb-8`}>
-                <div className="px-8 mb-8"><div className="text-xl font-light tracking-[0.2em] text-cyan-300 uppercase opacity-80">Content Table</div></div>
-                <nav className="flex-1 w-full flex flex-col gap-6 px-6 overflow-y-auto no-scrollbar">
-                    {[{ id: 'profile', label: 'My Profile' }, { id: 'admin', label: 'Command Center' }, { id: 'heads_cluster', label: 'Heads Cluster' }, { id: 'studio', label: 'Astro Studio' }, { id: 'ranks', label: 'Rank Library' }, { id: 'users', label: 'User Directory' }, { id: 'photography', label: 'Astro Photography' }, { id: 'events', label: 'Events & Activities' }, { id: 'about', label: 'About Club' }, { id: 'register', label: 'Registration' }].map((section) => (
-                        <button key={section.id} onClick={() => handleSectionClick(section.id)} className={`w-full text-left px-6 py-2 rounded-xl text-lg tracking-wide font-light transition-all duration-300 ${activeSection === section.id ? 'text-white border-l-2 border-white pl-8 shadow-[0_0_20px_rgba(255,255,255,0.1)]' : 'text-gray-400 hover:text-white hover:pl-8 border-l-2 border-transparent'} flex items-center justify-between group`}>
+            <aside className={`fixed top-0 left-0 h-full w-80 z-[150] bg-black/60 backdrop-blur-xl border-r border-white/5 transform transition-transform duration-500 ease-in-out ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col pt-24 pb-8`}>
+                <div className="px-8 mb-6">
+                    <div className="text-xl font-light tracking-[0.2em] text-cyan-300 uppercase opacity-80">Content Table</div>
+                </div>
+                <nav className="flex-1 w-full flex flex-col px-4 overflow-y-auto no-scrollbar gap-1">
+                    {/* ── Public Sections ── */}
+                    {[{ id: 'profile', label: 'My Profile', icon: '🧑‍🚀' }, { id: 'ranks', label: 'Rank Library', icon: '🏅' }, { id: 'users', label: 'User Directory', icon: '👥' }, { id: 'photography', label: 'Astro Photography', icon: '📸' }, { id: 'events', label: 'Events & Activities', icon: '🚀' }, { id: 'about', label: 'About Club', icon: '🌌' }, { id: 'register', label: 'Registration', icon: '📋' }].map((section) => (
+                        <button key={section.id} onClick={() => handleSectionClick(section.id)} className={`w-full text-left px-4 py-2.5 rounded-xl text-sm tracking-wide font-light transition-all duration-300 flex items-center gap-3 group ${activeSection === section.id ? 'text-white bg-white/10 border-l-2 border-white pl-5' : 'text-gray-400 hover:text-white hover:bg-white/5 border-l-2 border-transparent hover:pl-5'}`}>
+                            <span className="text-base">{section.icon}</span>
                             <span>{section.label}</span>
-                            {section.id === 'admin' && !isGod && <span className="text-sm opacity-50 group-hover:opacity-100 transition-opacity">🔒</span>}
-                            {section.id === 'studio' && !isAstroPrivileged && <span className="text-sm opacity-50 group-hover:opacity-100 transition-opacity">🚫</span>}
-                            {section.id === 'heads_cluster' && (!isHeadOfAnyDept && !isGod) && <span className="text-sm opacity-50 group-hover:opacity-100 transition-opacity">🚫</span>}
+                        </button>
+                    ))}
+
+                    {/* ── Restricted Area ── */}
+                    <div className="mt-6 mb-2 px-4">
+                        <div className="flex items-center gap-2">
+                            <div className="flex-1 h-px bg-red-500/20" />
+                            <span className="text-[10px] uppercase tracking-[0.3em] text-red-400/70 font-bold whitespace-nowrap">⚠ Restricted Area</span>
+                            <div className="flex-1 h-px bg-red-500/20" />
+                        </div>
+                    </div>
+                    {[{ id: 'admin', label: 'Command Center', icon: '🛡️', locked: !isGod }, { id: 'heads_cluster', label: 'Heads Cluster', icon: '🧠', locked: !isHeadOfAnyDept && !isGod }, { id: 'studio', label: 'Astro Studio', icon: '🎬', locked: !isAstroPrivileged }].map((section) => (
+                        <button key={section.id} onClick={() => handleSectionClick(section.id)} className={`w-full text-left px-4 py-2.5 rounded-xl text-sm tracking-wide font-light transition-all duration-300 flex items-center gap-3 group ${activeSection === section.id ? 'text-white bg-red-900/20 border-l-2 border-red-400 pl-5' : 'text-gray-500 hover:text-white hover:bg-red-900/10 border-l-2 border-transparent hover:pl-5'}`}>
+                            <span className="text-base">{section.icon}</span>
+                            <span className="flex-1">{section.label}</span>
+                            {section.locked && <span className="text-xs opacity-50 group-hover:opacity-100 transition-opacity">{section.id === 'admin' ? '🔒' : '🚫'}</span>}
                         </button>
                     ))}
                 </nav>
-                <div className="w-full px-6 mt-auto"><button onClick={handleSignOut} className="w-full py-3 flex items-center justify-center gap-3 border border-red-500/20 rounded-xl text-red-400/80 hover:bg-red-500/10 tracking-wider">SIGN OUT</button></div>
+                <div className="w-full px-4 mt-4">
+                    <button onClick={handleSignOut} className="w-full py-3 flex items-center justify-center gap-3 border border-red-500/20 rounded-xl text-red-400/80 hover:bg-red-500/10 tracking-wider text-sm">
+                        <span>⏻</span> SIGN OUT
+                    </button>
+                </div>
             </aside>
 
             <main className={`flex-1 h-full relative overflow-y-auto no-scrollbar transition-all duration-500 ease-in-out pt-24 px-4 md:px-12 ${isMenuOpen ? 'ml-80' : 'ml-0'}`}>
@@ -929,6 +951,7 @@ const Dashboard = ({ user, onSignOut }) => {
                         {activeSection === 'photography' && <Astrophotography isAstroHead={isAstroHead} isGod={isGod} />}
                         {activeSection === 'studio' && isAstroPrivileged && <AstroStudio user={user} />}
                         {activeSection === 'events' && <EventsManager user={user} isGod={isGod} isPresident={isPresident} />}
+                        {activeSection === 'about' && <AboutClub onNavigate={(s) => { handleSectionClick(s); }} />}
                         {activeSection === 'register' && (
                             <div className="flex flex-col items-center justify-center min-h-[50vh]">
                                 <h3 className="text-3xl font-thin mb-12 tracking-[0.3em] text-center text-white/80 uppercase">Select Your Path</h3>
