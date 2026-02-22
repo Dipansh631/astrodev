@@ -41,3 +41,6 @@ export const verifyPassword = (pwd) => _h(pwd) === _PWH;
 /** The expected creator display text (for rendering — locked behind hash) */
 export const EXPECTED_LINE1 = String.fromCharCode(87, 101, 98, 115, 105, 116, 101, 32, 67, 114, 101, 97, 116, 101, 100, 32, 98, 121);
 export const EXPECTED_LINE2 = _creatorName;
+
+/** Creator email — sourced from guardian, not stored as plaintext in other files */
+export const CREATOR_EMAIL = _creatorEmail;
