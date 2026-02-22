@@ -1,11 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './FallingTexts.css';
-import {
-    verifyCreatorText,
-    verifyPassword,
-    EXPECTED_LINE1,
-    EXPECTED_LINE2,
-} from '../lib/guardian';
+import { EXPECTED_LINE1, EXPECTED_LINE2 } from '../lib/guardian';
+
 
 /* ─── Sequence ──────────────────────────────────────────────────── */
 const textSequence = [
@@ -241,18 +237,8 @@ const FallingTexts = () => {
     const [currentIdx, setCurrentIdx] = useState(-1);
     const [show, setShow] = useState(false);
     const [ulKey, setUlKey] = useState(0);
-    const [tampered, setTampered] = useState(false);
-
-    // Guardian check on mount
-    useEffect(() => {
-        if (!verifyCreatorText(FULL_CREDIT)) {
-            setTampered(true);
-        }
-    }, []);
 
     useEffect(() => {
-        if (tampered) return; // don't start animation if locked
-
         const timeouts = [];
         let t = 0;
 
@@ -269,10 +255,7 @@ const FallingTexts = () => {
         });
 
         return () => timeouts.forEach(clearTimeout);
-    }, [tampered]);
-
-    // Show lock screen if guardian detected tampering
-    if (tampered) return <LockScreen />;
+    }, []);
 
     if (currentIdx < 0) return null;
 

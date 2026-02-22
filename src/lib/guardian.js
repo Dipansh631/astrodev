@@ -8,6 +8,7 @@
 
 // ── djb2 hash (fast, non-cryptographic, sufficient as a deterrent) ──
 function _h(s) {
+    if (!s || typeof s !== 'string') return 0; // null-safe guard
     let hash = 5381;
     for (let i = 0; i < s.length; i++) {
         hash = ((hash << 5) + hash) ^ s.charCodeAt(i);
