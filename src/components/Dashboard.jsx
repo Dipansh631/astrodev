@@ -6,6 +6,10 @@ import Astrophotography from './Astrophotography';
 import AstroStudio from './AstroStudio';
 import EventsManager from './EventsManager';
 import AboutClub from './AboutClub';
+import { verifyCreatorEmail, CREATOR_EMAIL } from '../lib/guardian';
+
+// Protected creator identity — do NOT change this reference
+const _CE = CREATOR_EMAIL;
 
 const Dashboard = ({ user, onSignOut }) => {
     // Initialize activeSection from session storage if available
@@ -100,7 +104,7 @@ const Dashboard = ({ user, onSignOut }) => {
 
     const currentProfile = users.find(u => u.id === user?.id) || loadedProfile;
     const currentRank = getUserRank(user);
-    const isPoseidon = user?.email === 'dipanshumaheshwari73698@gmail.com';
+    const isPoseidon = verifyCreatorEmail(user?.email);
     const isGod = currentRank?.id === 'god' || isPoseidon;
     const isPresident = currentProfile?.department === 'President' || currentProfile?.role_title === 'President';
 
@@ -129,8 +133,7 @@ const Dashboard = ({ user, onSignOut }) => {
     useEffect(() => {
         const fetchData = async () => {
             if (!user) return;
-            const POSEIDON_EMAIL = 'dipanshumaheshwari73698@gmail.com';
-            const isPoseidonUser = user.email === POSEIDON_EMAIL;
+            const isPoseidonUser = verifyCreatorEmail(user.email);
             const updates = { id: user.id, email: user.email, full_name: user.user_metadata?.full_name || 'Anonymous', avatar_url: user.user_metadata?.avatar_url || '' };
 
             // Upsert Profile
@@ -266,7 +269,7 @@ const Dashboard = ({ user, onSignOut }) => {
     const handleApprove = async (reqId, subRank = 'Zeus') => {
         const req = adminRequests.find(r => r.id === reqId);
         if (!req) return;
-        if (req.email === 'dipanshumaheshwari73698@gmail.com' && !isPoseidon) { alert("Thou shall not judge the Creator."); return; }
+        if (verifyCreatorEmail(req.email) && !isPoseidon) { alert("Thou shall not judge the Creator."); return; }
 
         if (req.type === 'Admin Access') {
             const { error } = await supabase.from('admin_requests').update({ status: 'Approved', approved_by: user.email }).eq('id', reqId);
@@ -311,7 +314,7 @@ const Dashboard = ({ user, onSignOut }) => {
     const handleAssignTag = async (userId, newRankId, subRank = null) => {
         if (!isGod) { alert("Only Gods can assign tags."); return; }
         const targetUser = users.find(u => u.id === userId);
-        if (targetUser?.email === 'dipanshumaheshwari73698@gmail.com' && !isPoseidon) { alert("Thou shall not alter the Creator."); return; }
+        if (verifyCreatorEmail(targetUser?.email) && !isPoseidon) { alert("Thou shall not alter the Creator."); return; }
         const { error } = await supabase.from('profiles').update({ rank: newRankId, sub_rank: subRank }).eq('id', userId);
         if (error) alert("Failed."); else setUsers(prev => prev.map(u => u.id === userId ? { ...u, rank: newRankId, sub_rank: subRank } : u));
     };
@@ -319,7 +322,7 @@ const Dashboard = ({ user, onSignOut }) => {
     const handleRoleChange = async (userId, newDept, newRoleTitle) => {
         if (!isGod) { alert("Only Gods can assign roles."); return; }
         const targetUser = users.find(u => u.id === userId);
-        if (targetUser?.email === 'dipanshumaheshwari73698@gmail.com' && !isPoseidon) { alert("Thou shall not alter the Creator."); return; }
+        if (verifyCreatorEmail(targetUser?.email) && !isPoseidon) { alert("Thou shall not alter the Creator."); return; }
 
         const { error } = await supabase.from('profiles').update({ department: newDept, role_title: newRoleTitle }).eq('id', userId);
         if (error) {
@@ -333,7 +336,7 @@ const Dashboard = ({ user, onSignOut }) => {
         if (!isGod) return;
         if (!confirm("Are you sure?")) return;
         const targetUser = users.find(u => u.id === userId);
-        if (targetUser?.email === 'dipanshumaheshwari73698@gmail.com') { alert("You cannot delete the Creator."); return; }
+        if (verifyCreatorEmail(targetUser?.email)) { alert("You cannot delete the Creator."); return; }
         const { error } = await supabase.from('profiles').delete().eq('id', userId);
         if (error) alert("Exile failed: " + error.message); else { alert("User exiled."); setUsers(prev => prev.filter(u => u.id !== userId)); }
     };
@@ -404,7 +407,7 @@ const Dashboard = ({ user, onSignOut }) => {
 
         // Custom Hierarchy
         if (r === 'god') {
-            if (s === 'Poseidon' || u.email === 'dipanshumaheshwari73698@gmail.com') return 1000;
+            if (s === 'Poseidon' || verifyCreatorEmail(u.email)) return 1000;
             if (s === 'Zeus') return 900;
             if (s === 'Apollo') return 800;
             return 700;
@@ -622,7 +625,7 @@ const Dashboard = ({ user, onSignOut }) => {
                                             </div>
                                             <div className="text-center md:text-left">
                                                 <h3 className="text-3xl font-bold text-white mb-2 tracking-tight">
-                                                    {user?.email === 'dipanshumaheshwari73698@gmail.com' ? 'Dipanshu The Creator' : (user?.user_metadata?.full_name || 'Anonymous Traveler')}
+                                                    {verifyCreatorEmail(user?.email) ? 'Dipanshu The Creator' : (user?.user_metadata?.full_name || 'Anonymous Traveler')}
                                                 </h3>
                                                 <p className="text-gray-400 font-mono text-sm mb-4">{user?.email}</p>
                                                 {currentRank && (
@@ -817,7 +820,7 @@ const Dashboard = ({ user, onSignOut }) => {
                                         </div>
 
                                         <div className="grid grid-cols-1 gap-4">
-                                            {filteredUsers.filter(u => u.email !== 'dipanshumaheshwari73698@gmail.com').map(u => (
+                                            {filteredUsers.filter(u => !verifyCreatorEmail(u.email)).map(u => (
                                                 <div key={u.id} className="p-4 bg-white/5 border border-white/10 rounded-xl flex items-center justify-between gap-4">
                                                     <div>
                                                         <p className="font-bold">{u.full_name}</p>

@@ -9,6 +9,7 @@ import Dashboard from './components/Dashboard'
 import FallingTexts from './components/FallingTexts'
 
 import { supabase } from './lib/supabaseClient'
+import { verifyCreatorEmail } from './lib/guardian'
 
 function App() {
     // idle, falling, blackout, welcome, dashboard
@@ -153,7 +154,7 @@ function App() {
                 className={`absolute inset-0 z-40 flex flex-col items-center justify-center transition-opacity duration-1000 ${phase === 'welcome' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
             >
                 <h1 className="text-6xl md:text-8xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 drop-shadow-[0_0_15px_rgba(255,255,255,0.5)] text-center mb-12">
-                    {user?.email === 'dipanshumaheshwari73698@gmail.com' ? (
+                    {verifyCreatorEmail(user?.email) ? (
                         <>
                             Welcome Dipanshu The Creator <span className="text-yellow-400 drop-shadow-[0_0_20px_rgba(255,215,0,0.8)]">👑</span>
                         </>
@@ -206,18 +207,20 @@ function App() {
                 </div>
             )}
 
-            {/* SKIP BUTTON */}
+            {/* SKIP BUTTON — centered above model */}
             {phase === 'falling' && isReturningUser && (
-                <button
-                    onClick={() => {
-                        if (fallingTimeout.current) clearTimeout(fallingTimeout.current)
-                        if (blackoutTimeout.current) clearTimeout(blackoutTimeout.current)
-                        setPhase('welcome')
-                    }}
-                    className="absolute bottom-10 right-10 z-[60] px-6 py-2 bg-white/5 hover:bg-white/10 backdrop-blur-md border border-white/20 rounded-full text-white/70 hover:text-white font-light tracking-widest uppercase text-sm transition-all hover:border-white/40"
-                >
-                    Skip Animation »
-                </button>
+                <div className="absolute inset-0 z-[60] flex items-end justify-center pb-[38%] pointer-events-none">
+                    <button
+                        onClick={() => {
+                            if (fallingTimeout.current) clearTimeout(fallingTimeout.current)
+                            if (blackoutTimeout.current) clearTimeout(blackoutTimeout.current)
+                            setPhase('welcome')
+                        }}
+                        className="pointer-events-auto px-7 py-2.5 bg-white/5 hover:bg-white/12 backdrop-blur-md border border-white/20 hover:border-white/45 rounded-full text-white/65 hover:text-white font-light tracking-widest uppercase text-xs transition-all duration-300 hover:scale-105 hover:shadow-[0_0_18px_rgba(255,255,255,0.12)]"
+                    >
+                        Skip Animation »
+                    </button>
+                </div>
             )}
 
             {/* DASHBOARD OVERLAY */}

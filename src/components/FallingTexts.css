@@ -1,0 +1,168 @@
+@keyframes ft-goldGlow {
+
+    0%,
+    100% {
+        text-shadow: 0 0 10px rgba(255, 200, 50, 0.9), 0 0 28px rgba(255, 140, 0, 0.6);
+    }
+
+    50% {
+        text-shadow: 0 0 20px rgba(255, 230, 80, 1), 0 0 55px rgba(255, 170, 0, 0.9);
+    }
+}
+
+@keyframes ft-underlineSlide {
+    from {
+        width: 0%;
+        opacity: 0;
+    }
+
+    to {
+        width: 100%;
+        opacity: 1;
+    }
+}
+
+@keyframes ft-starPulse {
+
+    0%,
+    100% {
+        opacity: 0.2;
+        transform: scale(0.75);
+    }
+
+    50% {
+        opacity: 1;
+        transform: scale(1.35);
+    }
+}
+
+/* ── Wrapper — all text at TOP ──────────────────────────────── */
+.ft-wrapper {
+    position: absolute;
+    inset: 0;
+    z-index: 30;
+    pointer-events: none;
+    display: flex;
+    align-items: flex-start;
+    padding-top: clamp(14px, 3.5vh, 48px);
+    padding-left: clamp(10px, 3vw, 60px);
+    padding-right: clamp(10px, 3vw, 60px);
+}
+
+.ft-wrapper.ft-align-left {
+    justify-content: flex-start;
+}
+
+.ft-wrapper.ft-align-right {
+    justify-content: flex-end;
+}
+
+.ft-wrapper.ft-align-center {
+    justify-content: center;
+}
+
+/* ── Content block ─────────────────────────────────────────── */
+.ft-content {
+    max-width: min(600px, 94vw);
+    width: 94vw;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    transition:
+        opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+        transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+        filter 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ft-content.ft-align-right {
+    text-align: right;
+}
+
+.ft-content.ft-align-center {
+    text-align: center;
+}
+
+.ft-content.ft-align-left {
+    text-align: left;
+}
+
+.ft-content.ft-show {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0px);
+}
+
+.ft-content.ft-hide {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.97);
+    filter: blur(4px);
+}
+
+/* ── Plain text (all non-highlight) ────────────────────────── */
+.ft-plain-heading {
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 700;
+    font-size: clamp(0.65rem, 3vw, 1.2rem);
+    letter-spacing: 0.08em;
+    color: rgba(220, 230, 255, 0.92);
+    text-shadow: 0 0 8px rgba(180, 210, 255, 0.25);
+    margin: 0;
+    line-height: 1.45;
+}
+
+/* ── Sub label (role) ───────────────────────────────────────── */
+.ft-plain-sub {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: clamp(0.6rem, 1.2vw, 0.8rem);
+    font-weight: 600;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: rgba(160, 185, 220, 0.7);
+    margin: 4px 0 0 0;
+    display: block;
+}
+
+/* ── Gold highlight span (only "Dipanshu Maheshwari") ───────── */
+.ft-gold {
+    color: #ffd966;
+    font-weight: 900;
+    animation: ft-goldGlow 2s ease-in-out infinite;
+}
+
+/* ── Underline ─────────────────────────────────────────────── */
+.ft-underline {
+    display: block;
+    height: 1.5px;
+    border-radius: 4px;
+    margin-top: 6px;
+    opacity: 0;
+    width: 0%;
+}
+
+.ft-underline.ft-ul-run {
+    animation: ft-underlineSlide 0.75s ease forwards;
+}
+
+.ft-underline-gold {
+    background: linear-gradient(90deg, transparent, #ffd700, #ff8c00, transparent);
+}
+
+.ft-underline-white {
+    background: linear-gradient(90deg, transparent, rgba(200, 215, 255, 0.6), transparent);
+}
+
+/* ── Letter reveal spans ────────────────────────────────────── */
+.ft-letter {
+    display: inline-block;
+    white-space: pre;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.ft-letter.ft-letter-show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.ft-letter.ft-letter-hide {
+    opacity: 0;
+    transform: translateY(10px);
+}
