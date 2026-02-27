@@ -260,12 +260,16 @@ const AboutClub = ({ onNavigate }) => {
         { value: '∞', suffix: '', label: 'Stars Observed', icon: '✨' },
     ];
 
-    if (showAnimation) {
-        return <BlackholeAnimation onComplete={() => setShowAnimation(false)} />;
-    }
-
+    // If showAnimation is true, we display the animation component overlaying the content.
+    // The main content should still be rendered (so it doesn't trigger scroll resets or weird visual jumps)
+    // but the animation component has `fixed inset-0 z-[100]` to cover everything.
     return (
         <div className="text-white space-y-28 pb-20 relative">
+            {showAnimation && (
+                <div className="fixed inset-0 z-[100]">
+                    <BlackholeAnimation onComplete={() => setShowAnimation(false)} />
+                </div>
+            )}
             <ShootingStarsCanvas />
 
             {/* ── HERO with shooting stars ── */}
