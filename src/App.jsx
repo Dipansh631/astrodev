@@ -56,7 +56,7 @@ function App() {
                 console.error("Error checking user status:", err)
             }
 
-            // Check if we should skip animation (e.g. on refresh)
+            // Check if we should skip animation (e.g. on refresh where phase was already dashboard)
             const savedPhase = sessionStorage.getItem('appPhase')
             if (savedPhase === 'dashboard') {
                 setPhase('dashboard')
