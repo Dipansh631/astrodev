@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import BlackholeAnimation from './BlackholeAnimation';
 
 /* ─────────────────────────────────────────
    SHOOTING STARS CANVAS
@@ -69,7 +70,7 @@ function ShootingStarsCanvas() {
             });
 
             // Draw shooting stars
-            shooters.forEach((sh, idx) => {
+            shooters.forEach((sh) => {
                 sh.tail.push({ x: sh.x, y: sh.y });
                 if (sh.tail.length > 18) sh.tail.shift();
 
@@ -116,8 +117,8 @@ function ShootingStarsCanvas() {
     return (
         <canvas
             ref={canvasRef}
-            className="absolute inset-0 w-full h-full pointer-events-none"
-            style={{ zIndex: 0 }}
+            className="fixed inset-0 w-full h-full pointer-events-none"
+            style={{ zIndex: -1 }}
         />
     );
 }
@@ -213,6 +214,7 @@ const DEPARTMENTS = [
    MAIN COMPONENT
 ───────────────────────────────────────── */
 const AboutClub = ({ onNavigate }) => {
+    const [showAnimation, setShowAnimation] = useState(true);
     const [activePillar, setActivePillar] = useState(null);
     const [liveStats, setLiveStats] = useState({
         members: null,
@@ -258,12 +260,16 @@ const AboutClub = ({ onNavigate }) => {
         { value: '∞', suffix: '', label: 'Stars Observed', icon: '✨' },
     ];
 
+    if (showAnimation) {
+        return <BlackholeAnimation onComplete={() => setShowAnimation(false)} />;
+    }
+
     return (
         <div className="text-white space-y-28 pb-20 relative">
+            <ShootingStarsCanvas />
 
             {/* ── HERO with shooting stars ── */}
             <div className="relative min-h-[50vh] flex flex-col items-center justify-center text-center overflow-hidden rounded-3xl border border-white/5 bg-black/30 p-12">
-                <ShootingStarsCanvas />
                 {/* Pulsing nebula orb */}
                 <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-3xl">
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] rounded-full bg-gradient-to-br from-blue-700/15 via-purple-700/15 to-transparent blur-3xl animate-pulse" />
@@ -285,10 +291,6 @@ const AboutClub = ({ onNavigate }) => {
             {/* ── LIVE STATS ── */}
             <RevealSection>
                 <div className="relative overflow-hidden rounded-3xl border border-white/8 bg-white/3 backdrop-blur-sm p-10">
-                    {/* subtle shooting stars inside stats too */}
-                    <div className="absolute inset-0 pointer-events-none opacity-40 overflow-hidden rounded-3xl">
-                        <ShootingStarsCanvas />
-                    </div>
                     <div className="relative z-10">
                         {statsLoading ? (
                             <div className="text-center text-gray-500 animate-pulse py-4">Loading orbital data...</div>
@@ -410,9 +412,6 @@ const AboutClub = ({ onNavigate }) => {
             <RevealSection>
                 <div className="relative p-12 rounded-3xl overflow-hidden border border-white/10">
                     <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 via-purple-900/20 to-pink-900/10 pointer-events-none rounded-3xl" />
-                    <div className="absolute inset-0 pointer-events-none opacity-30 rounded-3xl overflow-hidden">
-                        <ShootingStarsCanvas />
-                    </div>
                     <div className="relative z-10 text-center max-w-3xl mx-auto">
                         <div className="text-5xl mb-6">🌠</div>
                         <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 mb-6">Our Manifesto</h2>
