@@ -199,7 +199,13 @@ export default function BlackholeAnimation({ onComplete }) {
             {showCanvas && (
                 <div className="fixed inset-0 z-[9999] bg-black w-full h-[100dvh] overflow-hidden flex flex-col items-center justify-center pointer-events-none">
                     <div className="w-full h-full absolute inset-0">
-                        <Canvas camera={{ position: [0, 0, 3], fov: 60 }}>
+                        <Canvas
+                            camera={{ position: [0, 0, 3], fov: 60 }}
+                            onCreated={({ gl }) => {
+                                // Suppress harmless ANGLE/GLSL precision warnings on Windows
+                                gl.debug = { checkShaderErrors: false };
+                            }}
+                        >
                             <Suspense fallback={null}>
                                 <BlackholeScene phase={phase} />
                                 <EffectComposer disableNormalPass>
